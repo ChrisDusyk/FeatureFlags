@@ -61,6 +61,17 @@ dotnet ef migrations add <Name> --project FeatureFlags.Infrastructure --output-d
 
 `AppDbContextFactory` supplies a design-time connection string so the CLI can build the model without Aspire. In Development the server applies pending migrations at startup via `ApplyMigrationsAsync()`; deployed environments should migrate as a deliberate step instead.
 
+## Frontend
+
+The admin console (`frontend/`) is a React Router SPA that mirrors the backend's slice layout: a screen lives in `src/features/{aggregate}/{Screen}Page.tsx` and owns its own copy and content, while `src/shell/` holds the chrome every screen shares (`AppShell`, `ChromeRail`, `EnvironmentSpine`, `PageHeader`, `Unbuilt`).
+
+- **Design tokens** live in `src/styles/tokens.css`. Take colour, type, and spacing from there rather than hard-coding values. Colour carries one meaning: heat marks what is *live*, not what is *healthy* — amber is an enabled flag or production, never a success state.
+- **The environment spine** is the console's signature: the selected environment holds a full-height band of its own colour down the edge of the window and doubles as the switcher, so the blast radius of any change stays on screen. Environments are hard-coded in `src/shell/environment.ts` until the backend owns them.
+- **Navigation** is defined once in `src/shell/navigation.ts` and consumed by both the rail and the overview. Adding a screen means adding an entry there plus a route in `src/routes.tsx`.
+- **Screens without a feature behind them** use `<Unbuilt>` — it states plainly what will live there rather than dressing an empty page up as a finished one. Never fill a screen with invented data.
+- `app.MapFallbackToFile("index.html")` in `Program.cs` serves the SPA for client routes in deployed builds; Vite handles it in development.
+- `pnpm build` type-checks and builds; `pnpm lint` runs ESLint.
+
 ## Testing
 
 - `FeatureFlags.Domain.Tests` covers domain logic and the `Result`/`Option` primitives in isolation.
