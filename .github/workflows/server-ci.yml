@@ -57,4 +57,4 @@ jobs:
         run: dotnet build FeatureFlags.sln --no-restore --configuration Release
 
       - name: Test
-        run: dotnet test FeatureFlags.sln --no-build --configuration Release
+        run: dotnet test FeatureFlags.sln --no-build --no-restore --configuration Release
