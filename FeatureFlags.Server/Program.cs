@@ -1,4 +1,5 @@
 using FeatureFlags.Infrastructure;
+using FeatureFlags.Server.Features.Flags.CreateFlag;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -10,6 +11,10 @@ builder.AddInfrastructure();
 
 // Add services to the container.
 builder.Services.AddProblemDetails();
+builder.Services.AddSingleton(TimeProvider.System);
+
+// Feature slice handlers.
+builder.Services.AddScoped<CreateFlagHandler>();
 
 // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
 builder.Services.AddOpenApi();
@@ -22,6 +27,8 @@ app.UseExceptionHandler();
 if (app.Environment.IsDevelopment())
 {
     app.MapOpenApi();
+
+    await app.Services.ApplyMigrationsAsync();
 }
 
 app.UseOutputCache();
@@ -29,6 +36,9 @@ app.UseOutputCache();
 string[] summaries = ["Freezing", "Bracing", "Chilly", "Cool", "Mild", "Warm", "Balmy", "Hot", "Sweltering", "Scorching"];
 
 var api = app.MapGroup("/api");
+
+api.MapCreateFlag();
+
 api.MapGet("weatherforecast", () =>
 {
     var forecast = Enumerable.Range(1, 5).Select(index =>

@@ -4,3 +4,15 @@ GET {{Server_HostAddress}}/api/weatherforecast/
 Accept: application/json
 
 ###
+
+POST {{Server_HostAddress}}/api/flags
+Content-Type: application/json
+
+{
+  "key": "new-checkout",
+  "name": "New checkout",
+  "description": "Rolls out the rewritten checkout flow.",
+  "isEnabled": false
+}
+
+###
