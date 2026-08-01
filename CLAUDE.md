@@ -49,6 +49,17 @@ Domain code that can meaningfully return "nothing" (e.g. repository lookups) ret
 
 - All EF Core / Postgres concerns live in `FeatureFlags.Infrastructure`. Domain entities are persistence-ignorant — no EF attributes; configure via `IEntityTypeConfiguration<T>` under `Infrastructure/Persistence/Configurations/`.
 - `AppDbContext` is registered via `builder.AddInfrastructure()` (Infrastructure/DependencyInjection.cs), which uses the Aspire Postgres client integration (`AddNpgsqlDbContext`) against the `featureflagsdb` connection defined in `AppHost.cs`.
+- Value objects map through EF value converters (see `FeatureFlagConfiguration`). Give each one a `FromPersisted` factory for rehydration so the validating `Create` stays the only public way to build a new instance.
+
+### Migrations
+
+`dotnet-ef` is pinned in `.config/dotnet-tools.json`; run `dotnet tool restore` once, then:
+
+```
+dotnet ef migrations add <Name> --project FeatureFlags.Infrastructure --output-dir Persistence/Migrations
+```
+
+`AppDbContextFactory` supplies a design-time connection string so the CLI can build the model without Aspire. In Development the server applies pending migrations at startup via `ApplyMigrationsAsync()`; deployed environments should migrate as a deliberate step instead.
 
 ## Testing
 
