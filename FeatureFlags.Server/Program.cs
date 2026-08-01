@@ -11,7 +11,7 @@ builder.AddInfrastructure();
 
 // Add services to the container.
 builder.Services.AddProblemDetails();
-builder.Services.AddSingleton(TimeProvider.System);
+builder.Services.AddSingleton<TimeProvider>(TimeProvider.System);
 
 // Feature slice handlers.
 builder.Services.AddScoped<CreateFlagHandler>();
