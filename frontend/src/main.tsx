@@ -1,10 +1,20 @@
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
-import './index.css';
-import App from './App.tsx';
+import { RouterProvider } from 'react-router-dom';
+
+import '@fontsource-variable/archivo/standard.css';
+import '@fontsource-variable/public-sans';
+import '@fontsource-variable/jetbrains-mono';
+
+import './styles/tokens.css';
+import './styles/base.css';
+import './styles/shell.css';
+import './styles/pages.css';
+
+import { router } from './routes';
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <App />
+    <RouterProvider router={router} />
   </StrictMode>,
 );

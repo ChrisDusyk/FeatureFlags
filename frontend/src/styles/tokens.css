@@ -1,0 +1,50 @@
+/*
+ * "Enamel & Signal" — the console's design tokens.
+ *
+ * Two surfaces, deliberately different: dark enamelled chrome for where you are,
+ * light bone workspace for what you're doing. Colour carries one meaning only —
+ * heat marks what is live, never what is healthy.
+ */
+
+:root {
+  color-scheme: light;
+
+  /* Chrome — enamelled evergreen */
+  --ink-900: #04100d;
+  --ink-800: #08201b;
+  --ink-700: #0e2c25;
+  --ink-600: #17453a;
+  --ink-fg: #dce7e2;
+  --ink-fg-dim: #8aa49c;
+
+  /* Workspace — cool bone */
+  --paper: #f0f2ee;
+  --surface: #ffffff;
+  --rule: #d8ddd6;
+  --rule-strong: #b9c1b8;
+  --graphite: #141d1a;
+  --graphite-dim: #56635d;
+
+  /* State. Amber means live, not good. */
+  --live: #e4671b;
+  --dormant: #93a29c;
+  --halt: #b32d1b;
+
+  /* Environment tones — cool for the safe places, hot for the real one */
+  --env-development: #16a093;
+  --env-staging: #8a7bee;
+  --env-production: #e4671b;
+
+  /* Type */
+  --font-display: 'Archivo Variable', 'Archivo', system-ui, sans-serif;
+  --font-body: 'Public Sans Variable', 'Public Sans', system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono Variable', 'JetBrains Mono', ui-monospace, monospace;
+
+  /* Metrics */
+  --spine-width: 1rem;
+  --chrome-width: 16.5rem;
+  --radius: 0.625rem;
+
+  /* Focus ring, redefined per surface */
+  --focus: #0f5c54;
+}
