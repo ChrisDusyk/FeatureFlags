@@ -1,0 +1,417 @@
+/* The shell: environment spine, chrome rail, workspace. */
+
+.shell {
+  display: grid;
+  grid-template-columns: var(--spine-width) var(--chrome-width) minmax(0, 1fr);
+  grid-template-rows: minmax(100dvh, auto);
+  grid-template-areas: 'spine chrome work';
+  min-height: 100dvh;
+}
+
+/* ---------------------------------------------------------------- spine ---
+ * The signature. A permanent band of the current environment's colour, so the
+ * blast radius of anything you do is never more than a glance away.
+ */
+
+.shell__spine {
+  position: sticky;
+  top: 0;
+  z-index: 40;
+  grid-area: spine;
+  height: 100dvh;
+}
+
+.spine {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  height: 100%;
+  padding: 1rem 0;
+  background: var(--tone);
+  box-shadow: inset -1px 0 0 rgb(0 0 0 / 0.2);
+  animation: spine-draw 520ms cubic-bezier(0.2, 0.75, 0.25, 1) both;
+  transform-origin: top center;
+}
+
+.spine:focus-visible {
+  outline: 2px solid var(--ink-900);
+  outline-offset: -5px;
+  border-radius: 0;
+}
+
+.spine__mark {
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 50%;
+  background: var(--ink-900);
+  opacity: 0.55;
+}
+
+.spine__label {
+  writing-mode: vertical-rl;
+  transform: rotate(180deg);
+  font-family: var(--font-mono);
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+  color: var(--ink-900);
+  white-space: nowrap;
+}
+
+.spine__caret {
+  width: 0.5rem;
+  height: 0.5rem;
+  border-right: 1.5px solid var(--ink-900);
+  border-bottom: 1.5px solid var(--ink-900);
+  transform: rotate(45deg);
+  transition: transform 160ms ease;
+}
+
+.spine__caret--open {
+  transform: rotate(225deg);
+}
+
+/* ------------------------------------------------------- environment menu --- */
+
+.envmenu {
+  position: absolute;
+  top: 1rem;
+  left: 100%;
+  z-index: 60;
+  width: 19rem;
+  padding: 0.375rem;
+  border: 1px solid var(--ink-600);
+  border-radius: var(--radius);
+  background: var(--ink-800);
+  box-shadow: 0 18px 40px -12px rgb(4 16 13 / 0.6);
+  animation: menu-in 140ms ease-out both;
+}
+
+.envmenu__heading {
+  padding: 0.5rem 0.625rem 0.375rem;
+  font-family: var(--font-mono);
+  font-size: 0.625rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--ink-fg-dim);
+}
+
+.envmenu__option {
+  display: grid;
+  grid-template-columns: 0.5rem 1fr;
+  gap: 0.75rem;
+  width: 100%;
+  padding: 0.625rem;
+  border-radius: 0.5rem;
+  text-align: left;
+  transition: background-color 120ms ease;
+}
+
+.envmenu__option:hover {
+  background: var(--ink-700);
+}
+
+.envmenu__option:focus-visible {
+  outline: 2px solid var(--ink-fg);
+  outline-offset: -2px;
+}
+
+.envmenu__swatch {
+  width: 0.5rem;
+  border-radius: 999px;
+  background: var(--tone);
+}
+
+.envmenu__name {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+  font-family: var(--font-display);
+  font-stretch: 112%;
+  font-weight: 600;
+  font-size: 0.9375rem;
+  color: var(--ink-fg);
+}
+
+.envmenu__key {
+  font-family: var(--font-mono);
+  font-size: 0.6875rem;
+  font-weight: 500;
+  color: var(--ink-fg-dim);
+}
+
+.envmenu__blurb {
+  display: block;
+  margin-top: 0.125rem;
+  font-size: 0.8125rem;
+  line-height: 1.45;
+  color: var(--ink-fg-dim);
+}
+
+.envmenu__current {
+  margin-left: auto;
+  font-family: var(--font-mono);
+  font-size: 0.625rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--tone);
+}
+
+/* --------------------------------------------------------------- chrome --- */
+
+.shell__chrome {
+  position: sticky;
+  top: 0;
+  z-index: 30;
+  grid-area: chrome;
+  display: flex;
+  flex-direction: column;
+  gap: 2rem;
+  height: 100dvh;
+  padding: 1.75rem 1rem 1.25rem;
+  overflow-y: auto;
+  background: var(--ink-800);
+  --focus: var(--ink-fg);
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0 0.5rem;
+}
+
+.brand__glyph {
+  flex: none;
+  color: var(--ink-fg);
+}
+
+.brand__name {
+  font-family: var(--font-display);
+  font-stretch: 118%;
+  font-weight: 700;
+  font-size: 0.9375rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--ink-fg);
+  line-height: 1.1;
+}
+
+.brand__role {
+  display: block;
+  font-family: var(--font-mono);
+  font-size: 0.625rem;
+  font-weight: 400;
+  letter-spacing: 0.2em;
+  color: var(--ink-fg-dim);
+}
+
+.nav {
+  display: flex;
+  flex-direction: column;
+  gap: 1.75rem;
+}
+
+.nav__label {
+  padding: 0 0.75rem;
+  margin-bottom: 0.5rem;
+  font-family: var(--font-mono);
+  font-size: 0.625rem;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--ink-fg-dim);
+}
+
+.nav__link {
+  display: block;
+  padding: 0.5rem 0.75rem;
+  border-radius: 0.4375rem;
+  font-size: 0.9375rem;
+  font-weight: 500;
+  color: var(--ink-fg-dim);
+  transition:
+    background-color 130ms ease,
+    color 130ms ease;
+  animation: rail-rise 420ms cubic-bezier(0.2, 0.75, 0.25, 1) both;
+  animation-delay: calc(140ms + var(--index) * 26ms);
+}
+
+.nav__link:hover {
+  background: var(--ink-700);
+  color: var(--ink-fg);
+}
+
+.nav__link--active {
+  background: var(--ink-700);
+  color: #ffffff;
+  box-shadow: inset 2px 0 0 var(--ink-fg);
+}
+
+.chrome__foot {
+  margin-top: auto;
+  padding: 0.75rem 0.75rem 0;
+  border-top: 1px solid var(--ink-700);
+  font-family: var(--font-mono);
+  font-size: 0.625rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--ink-fg-dim);
+}
+
+/* ------------------------------------------------------------ workspace --- */
+
+.shell__work {
+  grid-area: work;
+  min-width: 0;
+}
+
+.workspace {
+  max-width: 68rem;
+  padding: clamp(1.75rem, 3.5vw, 3.25rem) clamp(1.25rem, 3.5vw, 3.25rem) 5rem;
+  animation: view-in 220ms ease-out both;
+}
+
+/* ------------------------------------------------------------- mobile ---- */
+
+.shell__bar {
+  display: none;
+  grid-area: bar;
+}
+
+.shell__scrim {
+  display: none;
+}
+
+@media (max-width: 60rem) {
+  .shell {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto auto minmax(0, 1fr);
+    grid-template-areas: 'spine' 'bar' 'work';
+  }
+
+  .shell__spine {
+    height: var(--spine-width);
+  }
+
+  .spine {
+    flex-direction: row;
+    padding: 0 1rem;
+    box-shadow: inset 0 -1px 0 rgb(0 0 0 / 0.2);
+    transform-origin: left center;
+    animation-name: spine-draw-across;
+  }
+
+  .spine__label {
+    writing-mode: horizontal-tb;
+    transform: none;
+  }
+
+  .envmenu {
+    top: 100%;
+    left: 0.75rem;
+    width: min(19rem, calc(100vw - 1.5rem));
+  }
+
+  .shell__bar {
+    position: sticky;
+    top: var(--spine-width);
+    z-index: 30;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.75rem 1rem;
+    background: var(--ink-800);
+  }
+
+  .bar__toggle {
+    padding: 0.4375rem 0.75rem;
+    border: 1px solid var(--ink-600);
+    border-radius: 0.4375rem;
+    font-family: var(--font-mono);
+    font-size: 0.6875rem;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--ink-fg);
+  }
+
+  .shell__chrome {
+    position: fixed;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    z-index: 70;
+    width: min(var(--chrome-width), 82vw);
+    transform: translateX(-101%);
+    transition: transform 220ms cubic-bezier(0.2, 0.75, 0.25, 1);
+  }
+
+  .shell__chrome--open {
+    transform: translateX(0);
+    box-shadow: 0 0 60px rgb(4 16 13 / 0.5);
+  }
+
+  .shell__scrim {
+    display: block;
+    position: fixed;
+    inset: 0;
+    z-index: 60;
+    background: rgb(4 16 13 / 0.5);
+    animation: menu-in 160ms ease-out both;
+  }
+}
+
+/* ----------------------------------------------------------- keyframes --- */
+
+@keyframes spine-draw {
+  from {
+    transform: scaleY(0);
+  }
+  to {
+    transform: scaleY(1);
+  }
+}
+
+@keyframes spine-draw-across {
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: scaleX(1);
+  }
+}
+
+@keyframes rail-rise {
+  from {
+    opacity: 0;
+    transform: translateY(0.375rem);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes view-in {
+  from {
+    opacity: 0;
+    transform: translateY(0.375rem);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes menu-in {
+  from {
+    opacity: 0;
+    transform: translateY(-0.25rem);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
