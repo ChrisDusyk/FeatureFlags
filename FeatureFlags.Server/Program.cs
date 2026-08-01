@@ -58,6 +58,10 @@ app.MapDefaultEndpoints();
 
 app.UseFileServer();
 
+// The console is a single-page app: every client route that isn't a file or an
+// API endpoint has to be answered with its shell so deep links survive a reload.
+app.MapFallbackToFile("index.html");
+
 app.Run();
 
 record WeatherForecast(DateOnly Date, int TemperatureC, string? Summary)
