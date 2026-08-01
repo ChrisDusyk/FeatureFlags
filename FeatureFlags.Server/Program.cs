@@ -58,8 +58,16 @@ app.MapDefaultEndpoints();
 
 app.UseFileServer();
 
-// The console is a single-page app: every client route that isn't a file or an
-// API endpoint has to be answered with its shell so deep links survive a reload.
+// An unmatched /api route is a caller's mistake, not a console route. Claim it
+// here — the literal segment outranks the catch-all below at the same order — so
+// a bad API call gets a 404 instead of a 200 full of HTML.
+api.MapFallback(() => Results.Problem(
+    statusCode: StatusCodes.Status404NotFound,
+    title: "Not found",
+    detail: "No API endpoint matches this route."));
+
+// The console is a single-page app: every remaining client route has to be
+// answered with its shell so deep links survive a reload.
 app.MapFallbackToFile("index.html");
 
 app.Run();

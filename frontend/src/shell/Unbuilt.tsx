@@ -1,3 +1,5 @@
+import { useId } from 'react';
+
 export interface PlannedCapability {
   title: string;
   text: string;
@@ -16,10 +18,12 @@ export function Unbuilt({
   body: string;
   planned: PlannedCapability[];
 }) {
+  const titleId = useId();
+
   return (
-    <section className="stub" aria-labelledby="unbuilt-title">
+    <section className="stub" aria-labelledby={titleId}>
       <p className="stub__tag">Not built yet</p>
-      <h2 className="stub__title" id="unbuilt-title">
+      <h2 className="stub__title" id={titleId}>
         {title}
       </h2>
       <p className="stub__body">{body}</p>

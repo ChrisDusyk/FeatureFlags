@@ -90,11 +90,7 @@ export function EnvironmentSwitcher({ compact = false }: { compact?: boolean }) 
 
   return (
     <div className={compact ? 'envswitch envswitch--compact' : 'envswitch'} ref={rootRef}>
-      {!compact && (
-        <span className="envswitch__label" id={`${listId}-label`}>
-          Environment
-        </span>
-      )}
+      {!compact && <span className="envswitch__label">Environment</span>}
 
       <button
         ref={buttonRef}
@@ -103,7 +99,8 @@ export function EnvironmentSwitcher({ compact = false }: { compact?: boolean }) 
         style={{ '--tone': environment.tone } as CSSProperties}
         aria-haspopup="listbox"
         aria-expanded={open}
-        aria-label={compact ? `Environment: ${environment.name}` : undefined}
+        aria-controls={open ? listId : undefined}
+        aria-label={`Environment: ${environment.name}`}
         onClick={() => (open ? close(false) : openList())}
       >
         <span className="envswitch__dot" aria-hidden="true" />
@@ -126,17 +123,13 @@ export function EnvironmentSwitcher({ compact = false }: { compact?: boolean }) 
       </button>
 
       {open && (
-        <div
-          className="envpanel"
-          role="listbox"
-          aria-label="Environment"
-          aria-activedescendant={`${listId}-${activeIndex}`}
-          onKeyDown={onListKeyDown}
-        >
+        // Focus rides the options themselves (roving tabIndex), so the listbox
+        // deliberately has no aria-activedescendant — that is for the other pattern,
+        // where focus stays on the container.
+        <div className="envpanel" id={listId} role="listbox" aria-label="Environment" onKeyDown={onListKeyDown}>
           {environments.map((option, index) => (
             <div
               key={option.id}
-              id={`${listId}-${index}`}
               ref={(node) => {
                 optionRefs.current[index] = node;
               }}

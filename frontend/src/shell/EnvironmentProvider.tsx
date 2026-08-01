@@ -11,18 +11,39 @@ const STORAGE_KEY = 'featureflags.console.environment';
 /** Development is the default on purpose — the safest place to land. */
 const FALLBACK: EnvironmentId = 'development';
 
+/*
+ * Storage can be unavailable outright — blocked by policy, disabled, or an
+ * embedded context with no access. Remembering the environment is a nicety;
+ * taking the console down with it is not, so both paths swallow the failure.
+ */
+
 function readStoredId(): EnvironmentId {
-  const stored = localStorage.getItem(STORAGE_KEY);
+  let stored: string | null = null;
+
+  try {
+    stored = localStorage.getItem(STORAGE_KEY);
+  } catch {
+    return FALLBACK;
+  }
+
   return environments.some((environment) => environment.id === stored)
     ? (stored as EnvironmentId)
     : FALLBACK;
+}
+
+function storeId(id: EnvironmentId): void {
+  try {
+    localStorage.setItem(STORAGE_KEY, id);
+  } catch {
+    // The choice still holds for this session, it just won't outlive the tab.
+  }
 }
 
 export function EnvironmentProvider({ children }: { children: ReactNode }) {
   const [id, setId] = useState<EnvironmentId>(readStoredId);
 
   useEffect(() => {
-    localStorage.setItem(STORAGE_KEY, id);
+    storeId(id);
   }, [id]);
 
   const selection = useMemo<EnvironmentSelection>(
