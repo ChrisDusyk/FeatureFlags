@@ -21,14 +21,18 @@ public sealed class CreateFlagHandler(IFeatureFlagRepository repository, TimePro
 
         var flag = flagResult.Value;
 
-        // Checked here so the caller gets a Conflict rather than an exception from the unique
-        // index. The index remains the real guard against a concurrent insert of the same key.
+        // Answers the common case without a round trip to a failed insert. The unique index is
+        // what actually settles a race, and SaveChangesAsync reports that as a failure too, so
+        // both paths return the same Conflict.
         var existing = await repository.GetByKeyAsync(flag.Key, cancellationToken);
         if (existing.IsSome)
             return Result.Failure<CreateFlagResponse>(FlagErrors.DuplicateKey(flag.Key));
 
         await repository.AddAsync(flag, cancellationToken);
-        await repository.SaveChangesAsync(cancellationToken);
+
+        var saveResult = await repository.SaveChangesAsync(cancellationToken);
+        if (saveResult.IsFailure)
+            return Result.Failure<CreateFlagResponse>(saveResult.Error);
 
         return Result.Success(CreateFlagResponse.From(flag));
     }

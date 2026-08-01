@@ -108,6 +108,22 @@ public class CreateFlagHandlerTests
     }
 
     [Fact]
+    public async Task HandleAsync_WhenSaveHitsTheUniqueIndex_ShouldReturnConflictNotThrow()
+    {
+        // The key was free at the check but taken by the time the insert ran.
+        var key = FlagKey.Create("new-checkout").Value;
+        _repository.FailNextSaveWith(FlagErrors.DuplicateKey(key));
+        var command = new CreateFlagCommand("new-checkout", "New checkout", null, IsEnabled: false);
+
+        var result = await CreateSut().HandleAsync(command, TestContext.Current.CancellationToken);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal(ErrorType.Conflict, result.Error.Type);
+        Assert.Equal("Flag.DuplicateKey", result.Error.Code);
+        Assert.Empty(_repository.Committed);
+    }
+
+    [Fact]
     public async Task HandleAsync_WithDisabledFlag_ShouldPersistAsDisabled()
     {
         var command = new CreateFlagCommand("new-checkout", "New checkout", null, IsEnabled: false);

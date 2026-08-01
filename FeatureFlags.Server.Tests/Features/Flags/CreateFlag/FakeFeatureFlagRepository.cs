@@ -12,11 +12,19 @@ internal sealed class FakeFeatureFlagRepository : IFeatureFlagRepository
     private readonly Dictionary<FlagKey, FeatureFlag> _committed = [];
     private readonly List<FeatureFlag> _pending = [];
 
+    private Error? _nextSaveFailure;
+
     public int SaveChangesCallCount { get; private set; }
 
     public IReadOnlyCollection<FeatureFlag> Committed => _committed.Values;
 
     public void Seed(FeatureFlag flag) => _committed[flag.Key] = flag;
+
+    /// <summary>
+    /// Makes the next save report a store-detected conflict, standing in for another writer
+    /// taking the key between the handler's check and its insert.
+    /// </summary>
+    public void FailNextSaveWith(Error error) => _nextSaveFailure = error;
 
     public Task<Option<FeatureFlag>> GetByKeyAsync(FlagKey key, CancellationToken cancellationToken = default) =>
         Task.FromResult(_committed.TryGetValue(key, out var flag)
@@ -29,15 +37,23 @@ internal sealed class FakeFeatureFlagRepository : IFeatureFlagRepository
         return Task.CompletedTask;
     }
 
-    public Task SaveChangesAsync(CancellationToken cancellationToken = default)
+    public Task<Result> SaveChangesAsync(CancellationToken cancellationToken = default)
     {
         SaveChangesCallCount++;
+
+        if (_nextSaveFailure is { } failure)
+        {
+            _nextSaveFailure = null;
+            _pending.Clear();
+
+            return Task.FromResult(Result.Failure(failure));
+        }
 
         foreach (var flag in _pending)
             _committed[flag.Key] = flag;
 
         _pending.Clear();
 
-        return Task.CompletedTask;
+        return Task.FromResult(Result.Success());
     }
 }

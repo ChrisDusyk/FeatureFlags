@@ -6,6 +6,12 @@ namespace FeatureFlags.Infrastructure.Persistence.Configurations;
 
 internal sealed class FeatureFlagConfiguration : IEntityTypeConfiguration<FeatureFlag>
 {
+    /// <summary>
+    /// Named explicitly (rather than left to EF's convention) because FeatureFlagRepository
+    /// matches on it to turn a unique violation into a duplicate-key failure.
+    /// </summary>
+    internal const string KeyIndexName = "IX_feature_flags_Key";
+
     public void Configure(EntityTypeBuilder<FeatureFlag> builder)
     {
         builder.ToTable("feature_flags");
@@ -24,6 +30,7 @@ internal sealed class FeatureFlagConfiguration : IEntityTypeConfiguration<Featur
             .IsRequired();
 
         builder.HasIndex(flag => flag.Key)
+            .HasDatabaseName(KeyIndexName)
             .IsUnique();
 
         builder.Property(flag => flag.Name)
