@@ -28,8 +28,8 @@ export function OverviewPage() {
         </p>
         <p className="envcard__blurb">{environment.blurb}</p>
         <p className="envcard__hint">
-          Everything you read and change in this console applies to {environment.name}. Switch it
-          from the coloured band along the edge of the window.
+          Everything you read and change in this console applies to {environment.name}. Change it
+          with the environment picker above the navigation.
         </p>
       </section>
 

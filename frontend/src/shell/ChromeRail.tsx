@@ -1,5 +1,6 @@
 import { NavLink } from 'react-router-dom';
 import type { CSSProperties } from 'react';
+import { EnvironmentSwitcher } from './EnvironmentSwitcher';
 import { Mark } from './Mark';
 import { navItemIndex, navigation } from './navigation';
 
@@ -14,6 +15,8 @@ export function ChromeRail({ id, open }: { id: string; open: boolean }) {
           <span className="brand__role">Console</span>
         </span>
       </div>
+
+      <EnvironmentSwitcher />
 
       <nav className="nav" aria-label="Console sections">
         {navigation.map((section) => (

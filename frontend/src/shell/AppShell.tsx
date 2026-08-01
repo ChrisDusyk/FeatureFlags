@@ -3,6 +3,7 @@ import { Outlet, useLocation } from 'react-router-dom';
 import { ChromeRail } from './ChromeRail';
 import { EnvironmentProvider } from './EnvironmentProvider';
 import { EnvironmentSpine } from './EnvironmentSpine';
+import { EnvironmentSwitcher } from './EnvironmentSwitcher';
 import { Mark } from './Mark';
 
 const NAV_ID = 'console-nav';
@@ -26,9 +27,9 @@ export function AppShell() {
 
         <div className="shell__bar">
           <div className="brand">
-            <Mark size={20} />
-            <span className="brand__name">FeatureFlags</span>
+            <Mark size={22} />
           </div>
+          <EnvironmentSwitcher compact />
           <button
             type="button"
             className="bar__toggle"

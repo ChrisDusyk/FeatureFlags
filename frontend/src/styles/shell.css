@@ -8,9 +8,11 @@
   min-height: 100dvh;
 }
 
-/* ---------------------------------------------------------------- spine ---
- * The signature. A permanent band of the current environment's colour, so the
- * blast radius of anything you do is never more than a glance away.
+/* ---------------------------------------------------------- environment ---
+ * Two elements, two jobs. The spine is the indicator: an ambient band of the
+ * working environment's colour that keeps the blast radius in frame. The
+ * switcher is the control, and it looks like one — a coloured edge is not a
+ * button, however much you want it to be.
  */
 
 .shell__spine {
@@ -19,145 +21,177 @@
   z-index: 40;
   grid-area: spine;
   height: 100dvh;
+  box-shadow: inset -1px 0 0 rgb(0 0 0 / 0.22);
 }
 
-.spine {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: space-between;
-  width: 100%;
-  height: 100%;
-  padding: 1rem 0;
-  background: var(--tone);
-  box-shadow: inset -1px 0 0 rgb(0 0 0 / 0.2);
-  animation: spine-draw 520ms cubic-bezier(0.2, 0.75, 0.25, 1) both;
-  transform-origin: top center;
-}
-
-.spine:focus-visible {
-  outline: 2px solid var(--ink-900);
-  outline-offset: -5px;
-  border-radius: 0;
-}
-
-.spine__mark {
-  width: 0.5rem;
-  height: 0.5rem;
-  border-radius: 50%;
-  background: var(--ink-900);
-  opacity: 0.55;
-}
-
-.spine__label {
-  writing-mode: vertical-rl;
-  transform: rotate(180deg);
-  font-family: var(--font-mono);
-  font-size: 0.6875rem;
-  font-weight: 600;
-  letter-spacing: 0.24em;
-  text-transform: uppercase;
-  color: var(--ink-900);
-  white-space: nowrap;
-}
-
-.spine__caret {
-  width: 0.5rem;
-  height: 0.5rem;
-  border-right: 1.5px solid var(--ink-900);
-  border-bottom: 1.5px solid var(--ink-900);
-  transform: rotate(45deg);
-  transition: transform 160ms ease;
-}
-
-.spine__caret--open {
-  transform: rotate(225deg);
-}
-
-/* ------------------------------------------------------- environment menu --- */
-
-.envmenu {
+/* The colour rides a pseudo-element so the sticky element itself stays untransformed. */
+.shell__spine::before {
+  content: '';
   position: absolute;
-  top: 1rem;
-  left: 100%;
-  z-index: 60;
-  width: 19rem;
-  padding: 0.375rem;
-  border: 1px solid var(--ink-600);
-  border-radius: var(--radius);
-  background: var(--ink-800);
-  box-shadow: 0 18px 40px -12px rgb(4 16 13 / 0.6);
-  animation: menu-in 140ms ease-out both;
+  inset: 0;
+  background: var(--tone);
+  transform-origin: top center;
+  animation: spine-draw 520ms cubic-bezier(0.2, 0.75, 0.25, 1) both;
 }
 
-.envmenu__heading {
-  padding: 0.5rem 0.625rem 0.375rem;
+.envswitch {
+  position: relative;
+}
+
+.envswitch--compact {
+  display: none;
+}
+
+.envswitch__label {
+  display: block;
+  padding: 0 0.25rem 0.4375rem;
   font-family: var(--font-mono);
   font-size: 0.625rem;
-  letter-spacing: 0.18em;
+  letter-spacing: 0.2em;
   text-transform: uppercase;
   color: var(--ink-fg-dim);
 }
 
-.envmenu__option {
+.envswitch__button {
   display: grid;
-  grid-template-columns: 0.5rem 1fr;
-  gap: 0.75rem;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0.625rem;
   width: 100%;
-  padding: 0.625rem;
+  padding: 0.625rem 0.75rem;
+  border: 1px solid var(--ink-600);
   border-radius: 0.5rem;
-  text-align: left;
-  transition: background-color 120ms ease;
-}
-
-.envmenu__option:hover {
   background: var(--ink-700);
+  text-align: left;
+  transition:
+    border-color 140ms ease,
+    background-color 140ms ease;
 }
 
-.envmenu__option:focus-visible {
-  outline: 2px solid var(--ink-fg);
-  outline-offset: -2px;
+.envswitch__button:hover {
+  border-color: var(--tone);
 }
 
-.envmenu__swatch {
-  width: 0.5rem;
-  border-radius: 999px;
+.envswitch__dot {
+  width: 0.625rem;
+  height: 0.625rem;
+  border-radius: 50%;
   background: var(--tone);
 }
 
-.envmenu__name {
+.envswitch__value {
   display: flex;
   align-items: baseline;
   gap: 0.5rem;
-  font-family: var(--font-display);
-  font-stretch: 112%;
-  font-weight: 600;
-  font-size: 0.9375rem;
-  color: var(--ink-fg);
+  min-width: 0;
 }
 
-.envmenu__key {
+.envswitch__name {
+  overflow: hidden;
+  font-size: 0.9375rem;
+  font-weight: 500;
+  color: var(--ink-fg);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.envswitch__key {
   font-family: var(--font-mono);
   font-size: 0.6875rem;
   font-weight: 500;
   color: var(--ink-fg-dim);
 }
 
-.envmenu__blurb {
-  display: block;
-  margin-top: 0.125rem;
-  font-size: 0.8125rem;
-  line-height: 1.45;
+.envswitch__caret {
+  display: flex;
+  color: var(--ink-fg-dim);
+  transition: transform 160ms ease;
+}
+
+.envswitch__caret--open {
+  transform: rotate(180deg);
+}
+
+.envpanel {
+  position: absolute;
+  top: calc(100% + 0.375rem);
+  right: -0.5rem;
+  left: -0.5rem;
+  z-index: 60;
+  padding: 0.3125rem;
+  border: 1px solid var(--ink-600);
+  border-radius: var(--radius);
+  background: var(--ink-800);
+  box-shadow: 0 20px 44px -14px rgb(4 16 13 / 0.7);
+  animation: menu-in 140ms ease-out both;
+}
+
+.envoption {
+  display: grid;
+  grid-template-columns: 0.625rem minmax(0, 1fr);
+  gap: 0.625rem;
+  padding: 0.5625rem 0.625rem;
+  border-radius: 0.4375rem;
+  cursor: pointer;
+}
+
+.envoption:hover,
+.envoption:focus {
+  background: var(--ink-700);
+  outline: none;
+}
+
+.envoption:focus-visible {
+  outline: 2px solid var(--ink-fg);
+  outline-offset: -2px;
+}
+
+.envoption--selected {
+  background: var(--ink-700);
+  box-shadow: inset 2px 0 0 var(--tone);
+}
+
+.envoption__dot {
+  width: 0.625rem;
+  height: 0.625rem;
+  margin-top: 0.375rem;
+  border-radius: 50%;
+  background: var(--tone);
+}
+
+.envoption__body {
+  min-width: 0;
+}
+
+.envoption__head {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+}
+
+.envoption__name {
+  font-size: 0.9375rem;
+  font-weight: 500;
+  color: var(--ink-fg);
+}
+
+.envoption--selected .envoption__name {
+  color: #ffffff;
+}
+
+.envoption__key {
+  font-family: var(--font-mono);
+  font-size: 0.6875rem;
+  font-weight: 500;
   color: var(--ink-fg-dim);
 }
 
-.envmenu__current {
-  margin-left: auto;
-  font-family: var(--font-mono);
-  font-size: 0.625rem;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  color: var(--tone);
+.envoption__blurb {
+  display: block;
+  margin-top: 0.125rem;
+  font-size: 0.8125rem;
+  line-height: 1.4;
+  color: var(--ink-fg-dim);
 }
 
 /* --------------------------------------------------------------- chrome --- */
@@ -169,7 +203,7 @@
   grid-area: chrome;
   display: flex;
   flex-direction: column;
-  gap: 2rem;
+  gap: 1.75rem;
   height: 100dvh;
   padding: 1.75rem 1rem 1.25rem;
   overflow-y: auto;
@@ -294,25 +328,12 @@
 
   .shell__spine {
     height: var(--spine-width);
+    box-shadow: inset 0 -1px 0 rgb(0 0 0 / 0.22);
   }
 
-  .spine {
-    flex-direction: row;
-    padding: 0 1rem;
-    box-shadow: inset 0 -1px 0 rgb(0 0 0 / 0.2);
+  .shell__spine::before {
     transform-origin: left center;
     animation-name: spine-draw-across;
-  }
-
-  .spine__label {
-    writing-mode: horizontal-tb;
-    transform: none;
-  }
-
-  .envmenu {
-    top: 100%;
-    left: 0.75rem;
-    width: min(19rem, calc(100vw - 1.5rem));
   }
 
   .shell__bar {
@@ -321,9 +342,34 @@
     z-index: 30;
     display: flex;
     align-items: center;
-    justify-content: space-between;
+    gap: 0.75rem;
     padding: 0.75rem 1rem;
     background: var(--ink-800);
+  }
+
+  /* On mobile the rail is behind a menu, so the switcher moves to the bar. */
+  .shell__chrome > .envswitch {
+    display: none;
+  }
+
+  .envswitch--compact {
+    display: block;
+    margin-left: auto;
+  }
+
+  .envswitch--compact .envswitch__button {
+    gap: 0.4375rem;
+    padding: 0.375rem 0.5rem;
+  }
+
+  .envswitch--compact .envswitch__name {
+    font-size: 0.8125rem;
+  }
+
+  .envswitch--compact .envpanel {
+    right: 0;
+    left: auto;
+    width: min(17rem, calc(100vw - 2rem));
   }
 
   .bar__toggle {
