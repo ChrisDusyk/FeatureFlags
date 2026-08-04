@@ -1,9 +1,15 @@
+import { useState } from 'react';
+
 import { PageHeader } from '../../shell/PageHeader';
-import { Unbuilt } from '../../shell/Unbuilt';
 import { useEnvironment } from '../../shell/environment';
+import { FlagRow } from './FlagRow';
+import { NewFlagDialog } from './NewFlagDialog';
+import { useFlags } from './useFlags';
 
 export function FlagsPage() {
   const { environment } = useEnvironment();
+  const { state, reload, replace } = useFlags(environment.key);
+  const [creating, setCreating] = useState(false);
 
   return (
     <>
@@ -12,24 +18,66 @@ export function FlagsPage() {
         title="Flags"
         lede={`Every feature your app can switch on, and whether it is on in ${environment.name}.`}
       />
-      <Unbuilt
-        title="The flag list lands here."
-        body="The API can create a flag today. Reading, toggling, and editing come next — this screen will hold one row per flag, scoped to the environment you are working in."
-        planned={[
-          {
-            title: 'Read state before you read names',
-            text: 'Each row carries its on-or-off state as a coloured edge, so the shape of a few hundred flags is legible in one pass.',
-          },
-          {
-            title: 'Toggle on the record',
-            text: 'Every switch captures who threw it, when, and in which environment.',
-          },
-          {
-            title: 'Create a flag',
-            text: 'A key, a name, a description, and the state it starts in. Keys are lowercase slugs and cannot be reused.',
-          },
-        ]}
-      />
+
+      <div className="flagbar">
+        <p className="flagbar__count">
+          {state.status === 'ready'
+            ? `${state.flags.length} ${state.flags.length === 1 ? 'flag' : 'flags'}`
+            : ' '}
+        </p>
+        <button type="button" className="button" onClick={() => setCreating(true)}>
+          New flag
+        </button>
+      </div>
+
+      {state.status === 'loading' && (
+        <p className="flaglist__note" role="status">
+          Reading the flags in {environment.name}…
+        </p>
+      )}
+
+      {state.status === 'failed' && (
+        <div className="flaglist__failed" role="alert">
+          <p>{state.message}</p>
+          <button type="button" className="textlink" onClick={reload}>
+            Try again
+          </button>
+        </div>
+      )}
+
+      {/*
+        An empty list is not an unbuilt screen. This feature works — there is simply nothing in it
+        yet, and saying so plainly beats dressing the state up as something missing.
+      */}
+      {state.status === 'ready' && state.flags.length === 0 && (
+        <div className="flaglist__empty">
+          <h2 className="flaglist__emptytitle">No flags yet.</h2>
+          <p className="flaglist__emptybody">
+            A flag is a key your app can ask about — <code>new-checkout</code>, say — and an answer
+            that differs per environment. Make the first one and it will exist everywhere at once,
+            off until you turn it on.
+          </p>
+        </div>
+      )}
+
+      {state.status === 'ready' && state.flags.length > 0 && (
+        <ul className="flaglist">
+          {state.flags.map((flag) => (
+            <FlagRow key={flag.id} flag={flag} environment={environment} onReplace={replace} />
+          ))}
+        </ul>
+      )}
+
+      {creating && (
+        <NewFlagDialog
+          environment={environment}
+          onClose={() => setCreating(false)}
+          onCreated={() => {
+            setCreating(false);
+            reload();
+          }}
+        />
+      )}
     </>
   );
 }
