@@ -9,7 +9,8 @@
   "scripts": {
     "dev": "node --watch src/server.ts",
     "build": "tsc -b",
-    "start": "node dist/server.js"
+    "start": "node dist/server.js",
+    "migrate": "node dist/migrate-cli.js"
   },
   "dependencies": {
     "@hono/node-server": "^1.14.0",

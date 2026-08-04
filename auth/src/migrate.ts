@@ -12,9 +12,9 @@ import { ensureAuthSchema } from './db.ts';
  * the live schema against the configuration rather than replaying versioned files, so
  * there is no migration history to keep in step.
  *
- * Intended for local development against the Aspire-managed Postgres container, on the
- * same terms as the server's `ApplyMigrationsAsync()`; deployed environments should
- * migrate as a deliberate step.
+ * Called during startup when `applyMigrations` asks for it, on the same terms as the
+ * server's `ApplyMigrationsAsync()`, and by `pnpm migrate` (migrate-cli.ts) wherever
+ * migrating needs to be a step of its own rather than something startup does.
  */
 export async function applyAuthMigrations(): Promise<void> {
   await ensureAuthSchema();

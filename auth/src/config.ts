@@ -39,7 +39,12 @@ function required(name: string): string {
 function readDatabaseSettings(): DatabaseSettings {
   // Aspire hands non-.NET resources both a URI and the discrete properties. The URI
   // is the one documented for JavaScript apps, so prefer it and fall back to the parts.
-  const uri = process.env.FEATUREFLAGSDB_URI;
+  //
+  // FEATUREFLAGS_DATABASE_URL is the same thing under the name a self-hosting operator
+  // sets, shared with the server so that one variable configures both. Aspire's own
+  // variable is checked first, for the same reason the server's translation defers to
+  // it: under the AppHost, Aspire is the authority.
+  const uri = process.env.FEATUREFLAGSDB_URI ?? process.env.FEATUREFLAGS_DATABASE_URL;
 
   if (uri) {
     const parsed = new URL(uri);
@@ -86,5 +91,20 @@ export const trustedOrigins = (process.env.BETTER_AUTH_TRUSTED_ORIGINS ?? '')
   .map((origin) => origin.trim())
   .filter((origin) => origin.length > 0);
 
-/** Mirrors the server's `IsDevelopment()` guard around applying migrations at startup. */
-export const isProduction = process.env.NODE_ENV === 'production';
+const isProduction = process.env.NODE_ENV === 'production';
+
+/**
+ * Whether to reconcile the `auth` schema during startup.
+ *
+ * Mirrors the server's `FEATUREFLAGS_APPLY_MIGRATIONS`, and defaults the same way: on
+ * outside production, which is what the AppHost relies on. The compose bundle turns it
+ * on explicitly because it runs one replica of each service; the Helm chart leaves it
+ * off and runs `pnpm migrate` as a job instead.
+ *
+ * Ordering matters wherever this is decided: the server's own migration puts a trigger
+ * on `auth."user"`, so this has to have run before that one does. What enforces it is
+ * the readiness check in server.ts, which stays 503 until the table exists.
+ */
+export const applyMigrations = process.env.FEATUREFLAGS_APPLY_MIGRATIONS
+  ? process.env.FEATUREFLAGS_APPLY_MIGRATIONS === 'true'
+  : !isProduction;
