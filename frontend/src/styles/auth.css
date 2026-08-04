@@ -1,0 +1,208 @@
+/*
+ * Signing in, and the identity that follows you around afterwards.
+ *
+ * The auth screens are the one place with no chrome and no environment spine — you have not
+ * chosen a working environment yet, so the console does not pretend you have. A single card on
+ * the bone workspace, with the enamel reserved for the rail you are about to get back.
+ */
+
+/* --------------------------------------------------------------- signing in --- */
+
+.authpage {
+  display: grid;
+  place-items: center;
+  min-height: 100dvh;
+  padding: 2rem 1.25rem;
+  background: var(--paper);
+}
+
+.authcard {
+  width: 100%;
+  max-width: 25rem;
+  padding: 2.25rem 2rem 1.75rem;
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+  background: var(--surface);
+  /* The one warm edge: the same amber that marks a live flag, on the thing that makes you live. */
+  box-shadow:
+    inset 0 3px 0 var(--live),
+    0 1px 2px rgb(4 16 13 / 6%),
+    0 12px 32px -18px rgb(4 16 13 / 35%);
+}
+
+.authcard__brand {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 2rem;
+  color: var(--graphite);
+}
+
+.authcard__brand .brand__name {
+  color: var(--graphite);
+}
+
+.authcard__brand .brand__role {
+  color: var(--graphite-dim);
+}
+
+.authcard__title {
+  font-family: var(--font-display);
+  font-stretch: 112%;
+  font-size: 1.5rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: var(--graphite);
+}
+
+.authcard__lede {
+  margin-top: 0.5rem;
+  font-size: 0.9375rem;
+  line-height: 1.5;
+  color: var(--graphite-dim);
+}
+
+.authcard__foot {
+  margin-top: 1.5rem;
+  padding-top: 1.125rem;
+  border-top: 1px solid var(--rule);
+  font-size: 0.875rem;
+  color: var(--graphite-dim);
+}
+
+.authform {
+  display: flex;
+  flex-direction: column;
+  gap: 1.125rem;
+  margin-top: 1.75rem;
+}
+
+/* ------------------------------------------------------------------ fields --- */
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4375rem;
+}
+
+.field__label {
+  font-family: var(--font-mono);
+  font-size: 0.6875rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--graphite-dim);
+}
+
+.field__input {
+  width: 100%;
+  padding: 0.625rem 0.75rem;
+  border: 1px solid var(--rule-strong);
+  border-radius: 0.4375rem;
+  background: var(--surface);
+  font: inherit;
+  font-size: 0.9375rem;
+  color: var(--graphite);
+  transition:
+    border-color 130ms ease,
+    box-shadow 130ms ease;
+}
+
+.field__input:focus-visible {
+  outline: none;
+  border-color: var(--focus);
+  box-shadow: 0 0 0 3px rgb(15 92 84 / 18%);
+}
+
+.field__hint {
+  font-size: 0.8125rem;
+  color: var(--graphite-dim);
+}
+
+.field__error {
+  padding: 0.625rem 0.75rem;
+  border-left: 2px solid var(--halt);
+  background: rgb(179 45 27 / 6%);
+  font-size: 0.875rem;
+  color: var(--halt);
+}
+
+.button {
+  padding: 0.6875rem 1rem;
+  border: none;
+  border-radius: 0.4375rem;
+  background: var(--ink-700);
+  font-family: var(--font-display);
+  font-stretch: 108%;
+  font-size: 0.9375rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  color: var(--ink-fg);
+  cursor: pointer;
+  transition:
+    background-color 130ms ease,
+    color 130ms ease;
+}
+
+.button:hover:not(:disabled) {
+  background: var(--ink-600);
+  color: #ffffff;
+}
+
+.button:disabled {
+  background: var(--dormant);
+  cursor: default;
+}
+
+/* The gap between "we have a cookie" and "we know who you are" — usually imperceptible. */
+.authgate {
+  min-height: 100dvh;
+  background: var(--paper);
+}
+
+/* --------------------------------------------------------------- identity --- */
+
+.whoami {
+  display: flex;
+  flex-direction: column;
+  gap: 0.125rem;
+}
+
+.whoami__name {
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--ink-fg);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.whoami__meta {
+  font-family: var(--font-mono);
+  font-size: 0.625rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--ink-fg-dim);
+}
+
+.whoami__out {
+  align-self: start;
+  margin-top: 0.5rem;
+  padding: 0;
+  border: none;
+  background: none;
+  font: inherit;
+  font-size: 0.8125rem;
+  color: var(--ink-fg-dim);
+  text-decoration: underline;
+  text-underline-offset: 0.2em;
+  cursor: pointer;
+  transition: color 130ms ease;
+}
+
+.whoami__out:hover:not(:disabled) {
+  color: var(--ink-fg);
+}
+
+.whoami__out:disabled {
+  cursor: default;
+}
