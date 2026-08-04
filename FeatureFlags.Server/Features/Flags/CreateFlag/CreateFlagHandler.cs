@@ -13,7 +13,7 @@ public sealed class CreateFlagHandler(IFeatureFlagRepository repository, TimePro
             command.Key,
             command.Name,
             command.Description,
-            command.IsEnabled,
+            command.EnabledIn,
             timeProvider.GetUtcNow());
 
         if (flagResult.IsFailure)

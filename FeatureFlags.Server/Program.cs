@@ -1,6 +1,8 @@
 using FeatureFlags.Infrastructure;
 using FeatureFlags.Server.Api;
 using FeatureFlags.Server.Features.Flags.CreateFlag;
+using FeatureFlags.Server.Features.Flags.ListFlags;
+using FeatureFlags.Server.Features.Flags.ToggleFlag;
 using FeatureFlags.Server.Features.Users.GetCurrentUser;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -23,6 +25,8 @@ builder.Services.AddHttpForwarder();
 
 // Feature slice handlers.
 builder.Services.AddScoped<CreateFlagHandler>();
+builder.Services.AddScoped<ListFlagsHandler>();
+builder.Services.AddScoped<ToggleFlagHandler>();
 builder.Services.AddScoped<GetCurrentUserHandler>();
 
 // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
@@ -55,7 +59,9 @@ var api = app.MapGroup("/api");
 app.MapForwarder("/api/auth/{**catch-all}", app.Configuration.GetAuthServiceAddress())
     .WithName("ForwardToAuthService");
 
+api.MapListFlags();
 api.MapCreateFlag();
+api.MapToggleFlag();
 api.MapGetCurrentUser();
 
 api.MapGet("weatherforecast", () =>

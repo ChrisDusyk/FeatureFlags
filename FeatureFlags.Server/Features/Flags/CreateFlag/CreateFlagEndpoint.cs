@@ -1,3 +1,4 @@
+using FeatureFlags.Domain.Environments;
 using FeatureFlags.Domain.Shared;
 using FeatureFlags.Server.Api;
 
@@ -8,10 +9,28 @@ public static class CreateFlagEndpoint
     public static IEndpointRouteBuilder MapCreateFlag(this IEndpointRouteBuilder endpoints)
     {
         endpoints.MapPost("/flags", async (
-            CreateFlagCommand command,
+            CreateFlagRequest request,
             CreateFlagHandler handler,
             CancellationToken cancellationToken) =>
         {
+            // Resolve the environment names before the domain sees them, so an unrecognized one is
+            // a 400 about that name rather than a flag quietly created on in nowhere.
+            var enabledIn = new List<EnvironmentKey>();
+
+            foreach (var name in request.EnabledIn ?? [])
+            {
+                var environmentResult = EnvironmentKey.Create(name);
+
+                if (environmentResult.IsFailure)
+                {
+                    return environmentResult.Error.ToProblem();
+                }
+
+                enabledIn.Add(environmentResult.Value);
+            }
+
+            var command = new CreateFlagCommand(request.Key, request.Name, request.Description, enabledIn);
+
             var result = await handler.HandleAsync(command, cancellationToken);
 
             return result.Match(
