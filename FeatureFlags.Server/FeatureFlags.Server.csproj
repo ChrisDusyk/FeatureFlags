@@ -10,6 +10,14 @@
     <PackageReference Include="Aspire.StackExchange.Redis.OutputCaching" Version="13.4.6" />
     <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="10.0.10" />
     <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.8" />
+    <!--
+      Direct only to lift the transitive Microsoft.OpenApi off 2.0.0, which has a high-severity
+      advisory (GHSA-v5pm-xwqc-g5wc: a circular schema reference can terminate parsing), patched
+      in 2.7.5. Microsoft.AspNetCore.OpenApi asks for ">= 2.0.0" and NuGet resolves the lowest
+      match, so bumping the parent does not help — every 10.0.x still lands on 2.0.0. Nothing in
+      this project uses the package directly; drop this line once the parent's floor clears 2.7.5.
+    -->
+    <PackageReference Include="Microsoft.OpenApi" Version="2.7.5" />
     <PackageReference Include="Microsoft.Extensions.Http.Resilience" Version="10.6.0" />
     <PackageReference Include="Microsoft.Extensions.ServiceDiscovery" Version="10.6.0" />
     <PackageReference Include="OpenTelemetry.Exporter.OpenTelemetryProtocol" Version="1.15.3" />
