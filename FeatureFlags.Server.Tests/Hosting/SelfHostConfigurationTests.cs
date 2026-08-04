@@ -169,6 +169,31 @@ public class SelfHostConfigurationTests
         public IFileProvider ContentRootFileProvider { get; set; } = new NullFileProvider();
     }
 
+    [Fact]
+    public void ShouldApplyMigrations_IsImpliedByMigrateOnly()
+    {
+        // The chart's migration job sets only FEATUREFLAGS_MIGRATE_ONLY. Asking it to migrate and
+        // then exit without that implying "migrate" would produce a job that does nothing at all
+        // and reports success — the worst available outcome.
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                [SelfHostConfiguration.MigrateOnlyVariable] = "true"
+            })
+            .Build();
+
+        Assert.True(configuration.ShouldApplyMigrations(new StubEnvironment { EnvironmentName = Environments.Production }));
+        Assert.True(configuration.IsMigrateOnly());
+    }
+
+    [Fact]
+    public void IsMigrateOnly_IsOffWhenUnset()
+    {
+        var configuration = new ConfigurationBuilder().Build();
+
+        Assert.False(configuration.IsMigrateOnly());
+    }
+
     private static IConfiguration Build(Dictionary<string, string?> values)
     {
         var builder = Host.CreateEmptyApplicationBuilder(new HostApplicationBuilderSettings

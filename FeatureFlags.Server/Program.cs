@@ -72,6 +72,14 @@ if (app.Configuration.ShouldApplyMigrations(app.Environment))
     await app.Services.ApplyMigrationsAsync();
 }
 
+// Migrating is the whole job here, so stop rather than go on to serve. An unhandled exception
+// above has already left through Main by this point, which is what makes a failed migration a
+// non-zero exit and so a failed deployment.
+if (app.Configuration.IsMigrateOnly())
+{
+    return;
+}
+
 app.UseOutputCache();
 
 app.UseAuthentication();

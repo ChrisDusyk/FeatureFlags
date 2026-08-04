@@ -24,6 +24,7 @@ public static class SelfHostConfiguration
     public const string RedisUrlVariable = "FEATUREFLAGS_REDIS_URL";
     public const string AuthUrlVariable = "FEATUREFLAGS_AUTH_URL";
     public const string ApplyMigrationsVariable = "FEATUREFLAGS_APPLY_MIGRATIONS";
+    public const string MigrateOnlyVariable = "FEATUREFLAGS_MIGRATE_ONLY";
 
     private const string DatabaseConnectionStringKey = "ConnectionStrings:featureflagsdb";
     private const string CacheConnectionStringKey = "ConnectionStrings:cache";
@@ -65,7 +66,18 @@ public static class SelfHostConfiguration
     /// while the Helm chart defaults to running migrations as a job instead.
     /// </summary>
     public static bool ShouldApplyMigrations(this IConfiguration configuration, IHostEnvironment environment) =>
-        configuration.GetValue<bool?>(ApplyMigrationsVariable) ?? environment.IsDevelopment();
+        configuration.IsMigrateOnly()
+        || (configuration.GetValue<bool?>(ApplyMigrationsVariable) ?? environment.IsDevelopment());
+
+    /// <summary>
+    /// Whether to migrate and then exit rather than go on to serve.
+    ///
+    /// What makes a migration something a deployment can order. The Helm chart's pre-upgrade job
+    /// runs the server this way so that a failed migration fails the release before any deployment
+    /// is touched — a server that migrated and then started serving would never finish the job.
+    /// </summary>
+    public static bool IsMigrateOnly(this IConfiguration configuration) =>
+        configuration.GetValue<bool>(MigrateOnlyVariable);
 
     private static void Translate(
         IConfigurationManager configuration,
