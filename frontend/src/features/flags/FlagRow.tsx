@@ -16,7 +16,7 @@ export function FlagRow({
 }: {
   flag: Flag;
   environment: Environment;
-  onReplace: (flag: Flag) => void;
+  onReplace: (forEnvironmentKey: string, flag: Flag) => void;
 }) {
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -25,19 +25,28 @@ export function FlagRow({
     const next = !flag.isEnabled;
     const previous = flag;
 
+    // The environment this change is about, captured before the await. If the switcher moves
+    // while the request is in flight, the answer still belongs to the environment it was asked
+    // of — and onReplace drops it rather than applying it to whatever is on screen now.
+    const forEnvironmentKey = environment.key;
+
     setPending(true);
     setError(null);
 
     // Show the new state straight away — the switch should feel like a switch. Everything below
     // is about making sure the row never keeps a state the server did not accept.
-    onReplace({ ...flag, isEnabled: next });
+    onReplace(forEnvironmentKey, { ...flag, isEnabled: next });
 
     try {
-      const settled = await setFlagState(flag.key, environment.key, next);
+      const settled = await setFlagState(flag.key, forEnvironmentKey, next);
 
-      onReplace({ ...previous, isEnabled: settled.isEnabled, updatedAt: settled.updatedAt });
+      onReplace(forEnvironmentKey, {
+        ...previous,
+        isEnabled: settled.isEnabled,
+        updatedAt: settled.updatedAt,
+      });
     } catch (cause) {
-      onReplace(previous);
+      onReplace(forEnvironmentKey, previous);
       setError(
         cause instanceof ApiError
           ? cause.message

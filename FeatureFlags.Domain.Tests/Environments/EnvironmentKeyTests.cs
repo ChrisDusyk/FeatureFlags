@@ -31,7 +31,10 @@ public class EnvironmentKeyTests
     [Fact]
     public void Create_ShouldReturnTheSharedInstance()
     {
-        // Reference equality matters: FeatureFlag looks its states up by comparing environments.
+        // Nothing depends on this for correctness — EnvironmentKey is a record, so the == that
+        // FeatureFlag.StateIn uses compares Value. What it pins down is that Create hands back the
+        // instance from All rather than minting a new one, which is what keeps the closed set
+        // genuinely closed at three objects instead of one per call.
         var result = EnvironmentKey.Create("prod");
 
         Assert.Same(EnvironmentKey.Production, result.Value);

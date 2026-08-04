@@ -14,8 +14,11 @@ export interface FlagsResult {
   /**
    * Replaces one flag in place, so a toggle can show its result immediately and put the old
    * value back if the server refuses.
+   *
+   * Takes the environment the change belongs to, and ignores it if that is no longer the one on
+   * screen — see the guard in the implementation for why that matters.
    */
-  replace: (flag: Flag) => void;
+  replace: (forEnvironmentKey: string, flag: Flag) => void;
 }
 
 /**
@@ -56,16 +59,26 @@ export function useFlags(environmentKey: string): FlagsResult {
 
   const reload = useCallback(() => setReloadCount((count) => count + 1), []);
 
-  const replace = useCallback((flag: Flag) => {
-    setState((current) =>
-      current.status === 'ready'
-        ? {
-            status: 'ready',
-            flags: current.flags.map((candidate) => (candidate.id === flag.id ? flag : candidate)),
-          }
-        : current,
-    );
-  }, []);
+  const replace = useCallback(
+    (forEnvironmentKey: string, flag: Flag) => {
+      // A toggle still in flight when the environment changes comes back answering for the
+      // environment it started in. The flag has the same id in both, so applying it here would
+      // write development's isEnabled and timestamp onto the production row now on screen.
+      if (forEnvironmentKey !== environmentKey) {
+        return;
+      }
+
+      setState((current) =>
+        current.status === 'ready'
+          ? {
+              status: 'ready',
+              flags: current.flags.map((candidate) => (candidate.id === flag.id ? flag : candidate)),
+            }
+          : current,
+      );
+    },
+    [environmentKey],
+  );
 
   return { state, reload, replace };
 }

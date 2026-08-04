@@ -57,14 +57,11 @@ export function NewFlagDialog({
     }
   }
 
+  // onClose alone: `close` fires however the dialog went away — Escape, the Cancel button, or a
+  // successful create. Handling `cancel` as well would run this twice for Escape, since that path
+  // fires `cancel` and then `close`.
   return (
-    <dialog
-      className="dialog"
-      ref={dialogRef}
-      aria-labelledby="newflag-title"
-      onCancel={onClose}
-      onClose={onClose}
-    >
+    <dialog className="dialog" ref={dialogRef} aria-labelledby="newflag-title" onClose={onClose}>
       <form className="dialog__form" onSubmit={(event) => void handleSubmit(event)} noValidate>
         <h2 className="dialog__title" id="newflag-title">
           New flag
