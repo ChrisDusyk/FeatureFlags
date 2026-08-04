@@ -32,6 +32,10 @@ pnpm-debug.log*
 # User secrets / local config
 appsettings.*.local.json
 
+# A deployment's real configuration: the auth secret and the database password live here.
+# .env.example is the committed one.
+deploy/compose/.env
+
 # The OpenAPI document is generated on demand (-p:OpenApiGenerateDocumentsOnBuild=true) and
 # published as a release asset, so a copy in the tree would only ever be a stale one.
 openapi/
