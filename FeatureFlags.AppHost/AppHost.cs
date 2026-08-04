@@ -37,9 +37,19 @@ if (builder.ExecutionContext.IsPublishMode)
 }
 else
 {
+    // Aspire serves each resource from a `<resource>-<app>.dev.localhost` hostname, which is
+    // what a browser actually loads — the bare localhost URLs are internal. Both shapes are
+    // trusted here because either can be the origin depending on how the console was opened.
     auth.WithEnvironment(
         "BETTER_AUTH_TRUSTED_ORIGINS",
-        "http://localhost:*,https://localhost:*,http://127.0.0.1:*,https://127.0.0.1:*");
+        string.Join(',', [
+            "http://localhost:*",
+            "https://localhost:*",
+            "http://127.0.0.1:*",
+            "https://127.0.0.1:*",
+            "http://*.localhost:*",
+            "https://*.localhost:*"
+        ]));
 }
 
 var server = builder.AddProject<Projects.FeatureFlags_Server>("server")
