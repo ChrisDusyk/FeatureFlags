@@ -1,0 +1,32 @@
+# The server image builds from the repository root, so this is what decides how much of the
+# working tree gets sent to the daemon. Build outputs are the expensive part, and copying a
+# host-built bin/ into the image would also silently override what the build stage produced.
+
+**/bin/
+**/obj/
+**/node_modules/
+**/dist/
+
+.git/
+.github/
+.vscode/
+.idea/
+.claude/
+.agents/
+
+# Nothing under here is an input to an image build, and the compose bundle is what consumes
+# the images rather than the other way round.
+deploy/
+docs/
+openapi/
+
+**/*.md
+!CLAUDE.md
+
+FeatureFlags.AppHost/
+FeatureFlags.Domain.Tests/
+FeatureFlags.Server.Tests/
+
+**/.env
+**/*.log
+**/.DS_Store
