@@ -1,6 +1,8 @@
+using FeatureFlags.Domain.Environments;
 using FeatureFlags.Domain.Flags;
 using FeatureFlags.Domain.Shared;
 using FeatureFlags.Server.Features.Flags.CreateFlag;
+using FeatureFlags.Server.Tests.Fakes;
 using Microsoft.Extensions.Time.Testing;
 
 namespace FeatureFlags.Server.Tests.Features.Flags.CreateFlag;
@@ -8,6 +10,8 @@ namespace FeatureFlags.Server.Tests.Features.Flags.CreateFlag;
 public class CreateFlagHandlerTests
 {
     private static readonly DateTimeOffset Now = new(2026, 7, 31, 12, 0, 0, TimeSpan.Zero);
+
+    private static readonly EnvironmentKey[] Nowhere = [];
 
     private readonly FakeFeatureFlagRepository _repository = new();
     private readonly FakeTimeProvider _timeProvider = new(Now);
@@ -17,7 +21,7 @@ public class CreateFlagHandlerTests
     [Fact]
     public async Task HandleAsync_WithValidCommand_ShouldPersistFlagAndReturnResponse()
     {
-        var command = new CreateFlagCommand("new-checkout", "New checkout", "Rewritten checkout.", IsEnabled: true);
+        var command = new CreateFlagCommand("new-checkout", "New checkout", "Rewritten checkout.", [EnvironmentKey.Development]);
 
         var result = await CreateSut().HandleAsync(command, TestContext.Current.CancellationToken);
 
@@ -27,7 +31,6 @@ public class CreateFlagHandlerTests
         Assert.Equal("new-checkout", response.Key);
         Assert.Equal("New checkout", response.Name);
         Assert.Equal("Rewritten checkout.", response.Description);
-        Assert.True(response.IsEnabled);
         Assert.Equal(Now, response.CreatedAt);
         Assert.Equal(Now, response.UpdatedAt);
         Assert.NotEqual(Guid.Empty, response.Id);
@@ -41,7 +44,7 @@ public class CreateFlagHandlerTests
     public async Task HandleAsync_ShouldStampTimestampsFromTimeProvider()
     {
         _timeProvider.SetUtcNow(Now.AddDays(3));
-        var command = new CreateFlagCommand("new-checkout", "New checkout", null, IsEnabled: false);
+        var command = new CreateFlagCommand("new-checkout", "New checkout", null, Nowhere);
 
         var result = await CreateSut().HandleAsync(command, TestContext.Current.CancellationToken);
 
@@ -51,7 +54,7 @@ public class CreateFlagHandlerTests
     [Fact]
     public async Task HandleAsync_ShouldNormalizeKey()
     {
-        var command = new CreateFlagCommand("  NEW-Checkout  ", "New checkout", null, IsEnabled: false);
+        var command = new CreateFlagCommand("  NEW-Checkout  ", "New checkout", null, Nowhere);
 
         var result = await CreateSut().HandleAsync(command, TestContext.Current.CancellationToken);
 
@@ -62,8 +65,8 @@ public class CreateFlagHandlerTests
     [Fact]
     public async Task HandleAsync_WhenKeyAlreadyExists_ShouldReturnConflictAndNotPersist()
     {
-        _repository.Seed(FeatureFlag.Create("new-checkout", "Existing", null, isEnabled: false, Now).Value);
-        var command = new CreateFlagCommand("new-checkout", "New checkout", null, IsEnabled: false);
+        _repository.Seed(FeatureFlag.Create("new-checkout", "Existing", null, Nowhere, Now).Value);
+        var command = new CreateFlagCommand("new-checkout", "New checkout", null, Nowhere);
 
         var result = await CreateSut().HandleAsync(command, TestContext.Current.CancellationToken);
 
@@ -77,8 +80,8 @@ public class CreateFlagHandlerTests
     [Fact]
     public async Task HandleAsync_WhenKeyDiffersOnlyByCasing_ShouldReturnConflict()
     {
-        _repository.Seed(FeatureFlag.Create("new-checkout", "Existing", null, isEnabled: false, Now).Value);
-        var command = new CreateFlagCommand("NEW-CHECKOUT", "New checkout", null, IsEnabled: false);
+        _repository.Seed(FeatureFlag.Create("new-checkout", "Existing", null, Nowhere, Now).Value);
+        var command = new CreateFlagCommand("NEW-CHECKOUT", "New checkout", null, Nowhere);
 
         var result = await CreateSut().HandleAsync(command, TestContext.Current.CancellationToken);
 
@@ -96,7 +99,7 @@ public class CreateFlagHandlerTests
         string? name,
         string expectedCode)
     {
-        var command = new CreateFlagCommand(key, name, null, IsEnabled: false);
+        var command = new CreateFlagCommand(key, name, null, Nowhere);
 
         var result = await CreateSut().HandleAsync(command, TestContext.Current.CancellationToken);
 
@@ -113,7 +116,7 @@ public class CreateFlagHandlerTests
         // The key was free at the check but taken by the time the insert ran.
         var key = FlagKey.Create("new-checkout").Value;
         _repository.FailNextSaveWith(FlagErrors.DuplicateKey(key));
-        var command = new CreateFlagCommand("new-checkout", "New checkout", null, IsEnabled: false);
+        var command = new CreateFlagCommand("new-checkout", "New checkout", null, Nowhere);
 
         var result = await CreateSut().HandleAsync(command, TestContext.Current.CancellationToken);
 
@@ -124,13 +127,38 @@ public class CreateFlagHandlerTests
     }
 
     [Fact]
-    public async Task HandleAsync_WithDisabledFlag_ShouldPersistAsDisabled()
+    public async Task HandleAsync_ShouldReturnAStateForEveryEnvironment()
     {
-        var command = new CreateFlagCommand("new-checkout", "New checkout", null, IsEnabled: false);
+        var command = new CreateFlagCommand("new-checkout", "New checkout", null, [EnvironmentKey.Development]);
 
         var result = await CreateSut().HandleAsync(command, TestContext.Current.CancellationToken);
 
-        Assert.False(result.Value.IsEnabled);
-        Assert.False(Assert.Single(_repository.Committed).IsEnabled);
+        Assert.Equal(
+            EnvironmentKey.All.Select(environment => environment.Value),
+            result.Value.States.Select(state => state.Environment));
+    }
+
+    [Fact]
+    public async Task HandleAsync_ShouldEnableOnlyTheEnvironmentsAskedFor()
+    {
+        var command = new CreateFlagCommand("new-checkout", "New checkout", null, [EnvironmentKey.Development]);
+
+        var result = await CreateSut().HandleAsync(command, TestContext.Current.CancellationToken);
+
+        var persisted = Assert.Single(_repository.Committed);
+        Assert.True(persisted.IsEnabledIn(EnvironmentKey.Development));
+        Assert.False(persisted.IsEnabledIn(EnvironmentKey.Staging));
+        Assert.False(persisted.IsEnabledIn(EnvironmentKey.Production));
+    }
+
+    [Fact]
+    public async Task HandleAsync_WithNoEnvironments_ShouldPersistTheFlagOffEverywhere()
+    {
+        var command = new CreateFlagCommand("new-checkout", "New checkout", null, Nowhere);
+
+        var result = await CreateSut().HandleAsync(command, TestContext.Current.CancellationToken);
+
+        Assert.All(result.Value.States, state => Assert.False(state.IsEnabled));
+        Assert.All(Assert.Single(_repository.Committed).States, state => Assert.False(state.IsEnabled));
     }
 }

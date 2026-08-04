@@ -9,6 +9,12 @@ namespace FeatureFlags.Infrastructure.Persistence.Repositories;
 
 internal sealed class FeatureFlagRepository(AppDbContext dbContext) : IFeatureFlagRepository
 {
+    public async Task<IReadOnlyList<FeatureFlag>> ListAsync(CancellationToken cancellationToken = default) =>
+        // Owned collections come along without an Include, so every flag arrives with its states.
+        await dbContext.FeatureFlags
+            .OrderBy(flag => flag.Key)
+            .ToListAsync(cancellationToken);
+
     public async Task<Option<FeatureFlag>> GetByKeyAsync(FlagKey key, CancellationToken cancellationToken = default)
     {
         var flag = await dbContext.FeatureFlags

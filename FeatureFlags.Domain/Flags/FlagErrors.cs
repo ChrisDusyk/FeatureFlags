@@ -1,3 +1,4 @@
+using FeatureFlags.Domain.Environments;
 using FeatureFlags.Domain.Shared;
 
 namespace FeatureFlags.Domain.Flags;
@@ -31,4 +32,16 @@ public static class FlagErrors
     public static Error DuplicateKey(FlagKey key) => Error.Conflict(
         "Flag.DuplicateKey",
         $"A flag with the key '{key}' already exists.");
+
+    public static Error NotFound(FlagKey key) => Error.NotFound(
+        "Flag.NotFound",
+        $"No flag with the key '{key}' exists.");
+
+    /// <summary>
+    /// A flag that carries no state for an environment. Unreachable while the environment set is
+    /// fixed, and a genuine bug rather than a caller's mistake if it ever is reached.
+    /// </summary>
+    public static Error StateMissing(FlagKey key, EnvironmentKey environment) => Error.Failure(
+        "Flag.StateMissing",
+        $"The flag '{key}' carries no state for the '{environment}' environment.");
 }

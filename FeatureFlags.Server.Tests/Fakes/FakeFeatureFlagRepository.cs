@@ -1,11 +1,15 @@
 using FeatureFlags.Domain.Flags;
 using FeatureFlags.Domain.Shared;
 
-namespace FeatureFlags.Server.Tests.Features.Flags.CreateFlag;
+namespace FeatureFlags.Server.Tests.Fakes;
 
 /// <summary>
 /// In-memory stand-in for the EF repository. Tracks added flags and save calls so tests can
 /// assert the handler persists exactly once and only on the success path.
+/// <para>
+/// Lives outside Features/ because it stands in for a Domain interface that every flag slice
+/// depends on — copying it into each slice would make three of them drift.
+/// </para>
 /// </summary>
 internal sealed class FakeFeatureFlagRepository : IFeatureFlagRepository
 {
@@ -25,6 +29,10 @@ internal sealed class FakeFeatureFlagRepository : IFeatureFlagRepository
     /// taking the key between the handler's check and its insert.
     /// </summary>
     public void FailNextSaveWith(Error error) => _nextSaveFailure = error;
+
+    public Task<IReadOnlyList<FeatureFlag>> ListAsync(CancellationToken cancellationToken = default) =>
+        Task.FromResult<IReadOnlyList<FeatureFlag>>(
+            [.. _committed.Values.OrderBy(flag => flag.Key.Value, StringComparer.Ordinal)]);
 
     public Task<Option<FeatureFlag>> GetByKeyAsync(FlagKey key, CancellationToken cancellationToken = default) =>
         Task.FromResult(_committed.TryGetValue(key, out var flag)
