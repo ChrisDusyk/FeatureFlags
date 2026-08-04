@@ -1,5 +1,7 @@
 using FeatureFlags.Infrastructure;
+using FeatureFlags.Server.Api;
 using FeatureFlags.Server.Features.Flags.CreateFlag;
+using FeatureFlags.Server.Features.Users.GetCurrentUser;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -8,13 +10,20 @@ builder.AddServiceDefaults();
 builder.AddRedisClientBuilder("cache")
     .WithOutputCache();
 builder.AddInfrastructure();
+builder.AddConsoleAuthentication();
 
 // Add services to the container.
 builder.Services.AddProblemDetails();
 builder.Services.AddSingleton<TimeProvider>(TimeProvider.System);
 
+// Better Auth runs in its own Node process. Forwarding to it from here rather than exposing it
+// directly is what keeps the console on one origin, which is what keeps its session cookie
+// first-party — see the /api/auth route below.
+builder.Services.AddHttpForwarder();
+
 // Feature slice handlers.
 builder.Services.AddScoped<CreateFlagHandler>();
+builder.Services.AddScoped<GetCurrentUserHandler>();
 
 // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
 builder.Services.AddOpenApi();
@@ -33,11 +42,21 @@ if (app.Environment.IsDevelopment())
 
 app.UseOutputCache();
 
+app.UseAuthentication();
+app.UseAuthorization();
+
 string[] summaries = ["Freezing", "Bracing", "Chilly", "Cool", "Mild", "Warm", "Balmy", "Hot", "Sweltering", "Scorching"];
 
 var api = app.MapGroup("/api");
 
+// Everything Better Auth owns — sign-in, sign-up, sessions, tokens, the JWKS — is answered by
+// the auth service. The console never calls it directly: on this origin the session cookie is
+// first-party, and in development Vite's proxy already sends /api here.
+app.MapForwarder("/api/auth/{**catch-all}", app.Configuration.GetAuthServiceAddress())
+    .WithName("ForwardToAuthService");
+
 api.MapCreateFlag();
+api.MapGetCurrentUser();
 
 api.MapGet("weatherforecast", () =>
 {

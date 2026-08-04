@@ -18,10 +18,12 @@ public static class CreateFlagEndpoint
                 response => Results.Created($"/api/flags/{response.Key}", response),
                 error => error.ToProblem());
         })
+        .RequireAuthorization(AuthPolicies.SignedIn)
         .WithName("CreateFlag")
         .WithSummary("Creates a feature flag.")
         .Produces<CreateFlagResponse>(StatusCodes.Status201Created)
         .ProducesProblem(StatusCodes.Status400BadRequest)
+        .ProducesProblem(StatusCodes.Status401Unauthorized)
         .ProducesProblem(StatusCodes.Status409Conflict);
 
         return endpoints;
