@@ -4,8 +4,14 @@ using FeatureFlags.Server.Features.Flags.CreateFlag;
 using FeatureFlags.Server.Features.Flags.ListFlags;
 using FeatureFlags.Server.Features.Flags.ToggleFlag;
 using FeatureFlags.Server.Features.Users.GetCurrentUser;
+using FeatureFlags.Server.Hosting;
+using Microsoft.AspNetCore.HttpOverrides;
 
 var builder = WebApplication.CreateBuilder(args);
+
+// Before anything reads configuration: outside the AppHost the connection strings and the auth
+// service's address arrive under documented FEATUREFLAGS_* names instead of Aspire's keys.
+builder.AddSelfHostConfiguration();
 
 // Add service defaults & Aspire client integrations.
 builder.AddServiceDefaults();
@@ -32,15 +38,37 @@ builder.Services.AddScoped<GetCurrentUserHandler>();
 // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
 builder.Services.AddOpenApi();
 
+// Deployed, the console is reached through a TLS-terminating proxy — Caddy in the compose bundle,
+// an ingress controller in the chart. Without this the server believes every request is plain HTTP
+// and hands out http:// Location headers on the https:// origin it is actually serving.
+builder.Services.Configure<ForwardedHeadersOptions>(options =>
+{
+    options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
+
+    // The proxy is a neighbouring container or pod, not loopback, so the default known-proxy list
+    // would reject it. Trusting the hop is sound only because nothing else can reach this port:
+    // both deployment artifacts keep the server off the public network behind that proxy.
+    options.KnownIPNetworks.Clear();
+    options.KnownProxies.Clear();
+});
+
 var app = builder.Build();
 
 // Configure the HTTP request pipeline.
 app.UseExceptionHandler();
 
+if (app.Configuration.GetConsoleOrigin() is not null)
+{
+    app.UseForwardedHeaders();
+}
+
 if (app.Environment.IsDevelopment())
 {
     app.MapOpenApi();
+}
 
+if (app.Configuration.ShouldApplyMigrations(app.Environment))
+{
     await app.Services.ApplyMigrationsAsync();
 }
 
@@ -48,8 +76,6 @@ app.UseOutputCache();
 
 app.UseAuthentication();
 app.UseAuthorization();
-
-string[] summaries = ["Freezing", "Bracing", "Chilly", "Cool", "Mild", "Warm", "Balmy", "Hot", "Sweltering", "Scorching"];
 
 var api = app.MapGroup("/api");
 
@@ -63,21 +89,6 @@ api.MapListFlags();
 api.MapCreateFlag();
 api.MapToggleFlag();
 api.MapGetCurrentUser();
-
-api.MapGet("weatherforecast", () =>
-{
-    var forecast = Enumerable.Range(1, 5).Select(index =>
-        new WeatherForecast
-        (
-            DateOnly.FromDateTime(DateTime.Now.AddDays(index)),
-            Random.Shared.Next(-20, 55),
-            summaries[Random.Shared.Next(summaries.Length)]
-        ))
-        .ToArray();
-    return forecast;
-})
-.CacheOutput(p => p.Expire(TimeSpan.FromSeconds(5)))
-.WithName("GetWeatherForecast");
 
 app.MapDefaultEndpoints();
 
@@ -96,8 +107,3 @@ api.MapFallback(() => Results.Problem(
 app.MapFallbackToFile("index.html");
 
 app.Run();
-
-record WeatherForecast(DateOnly Date, int TemperatureC, string? Summary)
-{
-    public int TemperatureF => 32 + (int)(TemperatureC / 0.5556);
-}

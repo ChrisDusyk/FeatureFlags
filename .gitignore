@@ -31,3 +31,7 @@ pnpm-debug.log*
 
 # User secrets / local config
 appsettings.*.local.json
+
+# The OpenAPI document is generated on demand (-p:OpenApiGenerateDocumentsOnBuild=true) and
+# published as a release asset, so a copy in the tree would only ever be a stale one.
+openapi/

@@ -69,14 +69,15 @@ public static class AuthenticationExtensions
     }
 
     /// <summary>
-    /// The auth service's base address, as Aspire's <c>WithReference(auth)</c> injects it.
-    /// Absent means the server was started outside the AppHost, which is worth failing over
-    /// immediately rather than at somebody's first sign-in.
+    /// The auth service's base address, as Aspire's <c>WithReference(auth)</c> injects it, or as
+    /// <c>FEATUREFLAGS_AUTH_URL</c> supplies it in a self-hosted deployment. Absent means neither
+    /// happened, which is worth failing over immediately rather than at somebody's first sign-in.
     /// </summary>
     public static string GetAuthServiceAddress(this IConfiguration configuration) =>
         configuration["services:auth:http:0"]
         ?? throw new InvalidOperationException(
-            "The auth service address is not configured. Run the app through the Aspire AppHost.");
+            "The auth service address is not configured. Run the app through the Aspire AppHost, " +
+            "or set FEATUREFLAGS_AUTH_URL to the auth service's base address.");
 }
 
 /// <summary>
