@@ -1,4 +1,5 @@
 using FeatureFlags.Domain.Flags;
+using FeatureFlags.Domain.Users;
 using FeatureFlags.Infrastructure.Persistence;
 using FeatureFlags.Infrastructure.Persistence.Repositories;
 using Microsoft.EntityFrameworkCore;
@@ -14,6 +15,7 @@ public static class DependencyInjection
         builder.AddNpgsqlDbContext<AppDbContext>("featureflagsdb");
 
         builder.Services.AddScoped<IFeatureFlagRepository, FeatureFlagRepository>();
+        builder.Services.AddScoped<IUserRepository, UserRepository>();
 
         return builder;
     }

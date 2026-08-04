@@ -17,6 +17,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "FeatureFlags.Domain.Tests",
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "FeatureFlags.Server.Tests", "FeatureFlags.Server.Tests\FeatureFlags.Server.Tests.csproj", "{66C5E532-A4EE-4136-B283-BDDB3A3747AD}"
 EndProject
+Project("{54A90642-561A-4BB1-A94E-469ADEE60C69}") = "auth", "auth\auth.esproj", "{79808741-B37B-47B4-BBB7-896FFA4C32AF}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -107,6 +109,12 @@ Global
 		{66C5E532-A4EE-4136-B283-BDDB3A3747AD}.Release|x64.Build.0 = Release|Any CPU
 		{66C5E532-A4EE-4136-B283-BDDB3A3747AD}.Release|x86.ActiveCfg = Release|Any CPU
 		{66C5E532-A4EE-4136-B283-BDDB3A3747AD}.Release|x86.Build.0 = Release|Any CPU
+		{79808741-B37B-47B4-BBB7-896FFA4C32AF}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{79808741-B37B-47B4-BBB7-896FFA4C32AF}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{79808741-B37B-47B4-BBB7-896FFA4C32AF}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{79808741-B37B-47B4-BBB7-896FFA4C32AF}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{79808741-B37B-47B4-BBB7-896FFA4C32AF}.Release|x64.ActiveCfg = Release|Any CPU
+		{79808741-B37B-47B4-BBB7-896FFA4C32AF}.Release|x86.ActiveCfg = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

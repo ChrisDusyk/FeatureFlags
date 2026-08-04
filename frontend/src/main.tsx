@@ -10,6 +10,7 @@ import './styles/tokens.css';
 import './styles/base.css';
 import './styles/shell.css';
 import './styles/pages.css';
+import './styles/auth.css';
 
 import { router } from './routes';
 

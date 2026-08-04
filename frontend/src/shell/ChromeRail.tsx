@@ -3,6 +3,7 @@ import type { CSSProperties } from 'react';
 import { EnvironmentSwitcher } from './EnvironmentSwitcher';
 import { Mark } from './Mark';
 import { navItemIndex, navigation } from './navigation';
+import { SignedInAs } from './SignedInAs';
 
 /** The dark rail: brand, sections, and nothing that competes with the spine. */
 export function ChromeRail({ id, open }: { id: string; open: boolean }) {
@@ -42,7 +43,9 @@ export function ChromeRail({ id, open }: { id: string; open: boolean }) {
         ))}
       </nav>
 
-      <p className="chrome__foot">Preview build</p>
+      <div className="chrome__foot">
+        <SignedInAs />
+      </div>
     </aside>
   );
 }
