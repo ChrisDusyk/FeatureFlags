@@ -206,3 +206,11 @@
 .whoami__out:disabled {
   cursor: default;
 }
+
+.whoami__failed {
+  margin-top: 0.5rem;
+  font-size: 0.8125rem;
+  line-height: 1.4;
+  /* The rail is enamel, so the workspace's halt red would not read against it. */
+  color: var(--live);
+}

@@ -30,8 +30,11 @@ function expiryOf(token: string): number {
   }
 
   try {
-    const json = atob(payload.replace(/-/g, '+').replace(/_/g, '/'));
-    const claims: unknown = JSON.parse(json);
+    const base64 = payload.replace(/-/g, '+').replace(/_/g, '/');
+    // JWT payloads drop their padding. atob tolerates that for every length a valid
+    // payload can have, but restoring it costs nothing and saves the reader the detour.
+    const padded = base64.padEnd(base64.length + ((4 - (base64.length % 4)) % 4), '=');
+    const claims: unknown = JSON.parse(atob(padded));
 
     if (typeof claims === 'object' && claims !== null && 'exp' in claims) {
       const exp = (claims as { exp: unknown }).exp;
@@ -45,26 +48,34 @@ function expiryOf(token: string): number {
 }
 
 async function requestToken(): Promise<CachedToken | null> {
-  const response = await fetch(TOKEN_ENDPOINT, {
-    credentials: 'include',
-    headers: { accept: 'application/json' },
-  });
+  try {
+    const response = await fetch(TOKEN_ENDPOINT, {
+      credentials: 'include',
+      headers: { accept: 'application/json' },
+    });
 
-  if (!response.ok) {
+    if (!response.ok) {
+      return null;
+    }
+
+    const body: unknown = await response.json();
+    const value =
+      typeof body === 'object' && body !== null && 'token' in body
+        ? (body as { token: unknown }).token
+        : null;
+
+    if (typeof value !== 'string' || value.length === 0) {
+      return null;
+    }
+
+    return { value, expiresAt: expiryOf(value) };
+  } catch {
+    // The network failed, which is not the same as being told no. Report the token as
+    // unavailable rather than throwing: the caller's own request then goes out
+    // unauthenticated and comes back as a 401 it already knows how to handle, instead
+    // of an exception escaping from what looks like an ordinary fetch.
     return null;
   }
-
-  const body: unknown = await response.json();
-  const value =
-    typeof body === 'object' && body !== null && 'token' in body
-      ? (body as { token: unknown }).token
-      : null;
-
-  if (typeof value !== 'string' || value.length === 0) {
-    return null;
-  }
-
-  return { value, expiresAt: expiryOf(value) };
 }
 
 /**
