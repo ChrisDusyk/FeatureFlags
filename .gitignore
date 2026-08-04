@@ -4,6 +4,12 @@ obj/
 *.user
 .vs/
 
+# The JavaScript SDK builds its generated props path with a hardcoded Windows separator
+# ($(IntermediateOutputPath)\package.g.props in Sdk.targets), so on Linux and macOS it can
+# land as a directory literally named "obj\Debug" that the obj/ rule above never matches.
+# Current builds normalize it; this catches the case where they do not.
+obj\\Debug/
+
 # Aspire
 **/obj/.aspire/
 
