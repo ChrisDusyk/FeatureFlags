@@ -60,8 +60,35 @@ here means a value that reads correctly to a person also behaves correctly.
 {{- printf "%s/%s/featureflags-auth:%s" .Values.image.registry .Values.image.repository (.Values.image.tag | default .Chart.AppVersion) -}}
 {{- end -}}
 
-{{- define "featureflags.secretName" -}}
-{{- default (printf "%s-secrets" (include "featureflags.fullname" .)) .Values.betterAuth.existingSecret -}}
+{{/*
+The Secret this chart manages, and the two independent choices of where each value comes from.
+
+Deliberately three definitions rather than one. Folding them together couples settings that have
+nothing to do with each other: pointing `betterAuth.existingSecret` at a Secret you manage would
+also send the database lookups there, and since the chart then created no Secret of its own,
+every pod would ask for keys nothing had written.
+*/}}
+{{- define "featureflags.chartSecretName" -}}
+{{- printf "%s-secrets" (include "featureflags.fullname" .) -}}
+{{- end -}}
+
+{{- define "featureflags.authSecretName" -}}
+{{- default (include "featureflags.chartSecretName" .) .Values.betterAuth.existingSecret -}}
+{{- end -}}
+
+{{- define "featureflags.databaseSecretName" -}}
+{{- if and (not .Values.postgres.bundled) .Values.postgres.external.existingSecret -}}
+{{- .Values.postgres.external.existingSecret -}}
+{{- else -}}
+{{- include "featureflags.chartSecretName" . -}}
+{{- end -}}
+{{- end -}}
+
+{{/* Whether the chart still has to supply anything of its own. */}}
+{{- define "featureflags.needsChartSecret" -}}
+{{- if or (not .Values.betterAuth.existingSecret) .Values.postgres.bundled (not .Values.postgres.external.existingSecret) -}}
+true
+{{- end -}}
 {{- end -}}
 
 {{/* In-cluster addresses. Neither service is reachable from outside the namespace. */}}
@@ -88,11 +115,7 @@ so this deliberately cannot be configured to two different places.
 - name: FEATUREFLAGS_DATABASE_URL
   valueFrom:
     secretKeyRef:
-      {{- if and (not .Values.postgres.bundled) .Values.postgres.external.existingSecret }}
-      name: {{ .Values.postgres.external.existingSecret }}
-      {{- else }}
-      name: {{ include "featureflags.secretName" . }}
-      {{- end }}
+      name: {{ include "featureflags.databaseSecretName" . }}
       key: FEATUREFLAGS_DATABASE_URL
 {{- end -}}
 
@@ -100,6 +123,6 @@ so this deliberately cannot be configured to two different places.
 - name: BETTER_AUTH_SECRET
   valueFrom:
     secretKeyRef:
-      name: {{ include "featureflags.secretName" . }}
+      name: {{ include "featureflags.authSecretName" . }}
       key: BETTER_AUTH_SECRET
 {{- end -}}

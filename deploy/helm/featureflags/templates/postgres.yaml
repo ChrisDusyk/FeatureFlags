@@ -34,7 +34,10 @@ spec:
             - name: POSTGRES_PASSWORD
               valueFrom:
                 secretKeyRef:
-                  name: {{ include "featureflags.secretName" . }}
+                  # Always the chart's own Secret: the connection URL is composed from this
+                  # password at template time, so it cannot come from somewhere the chart
+                  # cannot read. An operator who wants to own that Secret wants postgres.external.
+                  name: {{ include "featureflags.chartSecretName" . }}
                   key: POSTGRES_PASSWORD
             # The image initialises the cluster in a subdirectory so that a volume with a
             # lost+found in it — which is most of them — is not mistaken for a broken data dir.

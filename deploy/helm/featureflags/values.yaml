@@ -68,9 +68,13 @@ postgres:
   image: postgres:17-alpine
   storage: 8Gi
   storageClassName: ""
-  # Only used when bundled. Ignored if external.url is set.
+  # Only used when bundled. Generate a URL-safe one — `openssl rand -hex 24`, not base64: this
+  # goes into a postgres:// URL, and a '/' in it would end the authority early.
+  #
+  # There is no `existingSecret` for the bundled database on purpose. The connection URL is
+  # composed from this password while templating, so it cannot come from a Secret the chart
+  # cannot read — if you want to own that Secret, you want `external` below.
   password: ""
-  existingSecret: ""
   external:
     # postgres://user:password@host:5432/featureflagsdb
     url: ""
