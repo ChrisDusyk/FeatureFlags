@@ -33,6 +33,18 @@ public static class SelfHostConfiguration
     private const int DefaultPostgresPort = 5432;
     private const int DefaultRedisPort = 6379;
 
+    private const string AuthUrlIsNotAnAddress =
+        $"{AuthUrlVariable} has to be an absolute http:// or https:// address, e.g. " +
+        "http://auth:8080. It is the auth service's address inside your network, and both the " +
+        "/api/auth forwarder and the JWKS lookup are built from it — without a scheme neither " +
+        "can dial anything, and the first sign-in is where that would otherwise be discovered.";
+
+    private const string AuthUrlCarriesMoreThanAnAddress =
+        $"{AuthUrlVariable} carries a query or a fragment, and it is a base address: the JWKS " +
+        "path and every forwarded request are appended to it, which would put them after the " +
+        "query rather than before it. Give it a scheme, a host, and a port. A path is fine — the " +
+        "forwarder and the JWKS lookup both build on it.";
+
     private const string OriginIsNotAnOrigin =
         $"{OriginVariable} has to start with https:// or http://, e.g. https://flags.example.com. " +
         "It is the origin a browser sends, not a hostname — the auth service compares it against " +
@@ -67,7 +79,7 @@ public static class SelfHostConfiguration
 
         Translate(builder.Configuration, translated, DatabaseConnectionStringKey, DatabaseUrlVariable, ToNpgsqlConnectionString);
         Translate(builder.Configuration, translated, CacheConnectionStringKey, RedisUrlVariable, ToRedisConfiguration);
-        Translate(builder.Configuration, translated, AuthServiceAddressKey, AuthUrlVariable, address => address.TrimEnd('/'));
+        Translate(builder.Configuration, translated, AuthServiceAddressKey, AuthUrlVariable, NormaliseAuthServiceAddress);
 
         // Checked here even though this service only reads it as a yes/no, because this is the
         // one process that reads the value at all in the compose bundle. The Helm chart refuses
@@ -94,6 +106,34 @@ public static class SelfHostConfiguration
     /// </summary>
     public static string? GetConsoleOrigin(this IConfiguration configuration) =>
         configuration[OriginVariable] is { Length: > 0 } origin ? origin : null;
+
+    /// <summary>
+    /// Checks that the auth service's address is one, and removes a trailing slash — the JWKS
+    /// address is built by concatenation, so a doubled slash would reach a different path.
+    ///
+    /// A path is deliberately allowed. Both consumers append to this value — YARP prepends the
+    /// prefix to every forwarded path, and the JWKS address is assembled the same way — so an
+    /// auth service mounted under one is reachable, and refusing it would rule out a deployment
+    /// that works. A query or a fragment is not: there is nothing coherent to append to, and both
+    /// consumers would silently build a URL nobody asked for.
+    /// </summary>
+    public static string NormaliseAuthServiceAddress(string value)
+    {
+        var address = value.TrimEnd('/');
+
+        // `Uri` reads "auth:8080" as the scheme "auth", so parsing alone is not the test.
+        if (!Uri.TryCreate(address, UriKind.Absolute, out var url) || url.Scheme is not ("http" or "https"))
+        {
+            throw new InvalidOperationException(AuthUrlIsNotAnAddress);
+        }
+
+        if (url.Query.Length > 0 || url.Fragment.Length > 0)
+        {
+            throw new InvalidOperationException(AuthUrlCarriesMoreThanAnAddress);
+        }
+
+        return address;
+    }
 
     /// <summary>
     /// Checks that a configured origin is one, and removes a trailing slash.

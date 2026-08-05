@@ -223,6 +223,35 @@ public class SelfHostConfigurationTests
     }
 
     [Theory]
+    [InlineData("http://auth:8080", "http://auth:8080")]
+    // The JWKS address is built by concatenation, so a trailing slash would double.
+    [InlineData("http://auth:8080/", "http://auth:8080")]
+    // Allowed on purpose: the forwarder prepends this to every path it forwards and the JWKS
+    // address is assembled the same way, so an auth service mounted under a prefix is reachable.
+    // Refusing it would rule out a deployment that works — unlike an origin, where it cannot.
+    [InlineData("https://internal.example.com/auth", "https://internal.example.com/auth")]
+    public void NormaliseAuthServiceAddress_AcceptsAnAddressAndDropsATrailingSlash(string value, string expected)
+    {
+        Assert.Equal(expected, SelfHostConfiguration.NormaliseAuthServiceAddress(value));
+    }
+
+    [Theory]
+    // Parses, into the scheme "auth" — which is why parsing alone is not the test.
+    [InlineData("auth:8080")]
+    [InlineData("//auth:8080")]
+    [InlineData("ftp://auth:8080")]
+    // A base address that things are appended to cannot carry either of these.
+    [InlineData("http://auth:8080?tenant=acme")]
+    [InlineData("http://auth:8080#fragment")]
+    public void NormaliseAuthServiceAddress_RejectsWhatCannotBeDialled(string value)
+    {
+        var exception = Assert.Throws<InvalidOperationException>(() =>
+            SelfHostConfiguration.NormaliseAuthServiceAddress(value));
+
+        Assert.Contains(SelfHostConfiguration.AuthUrlVariable, exception.Message);
+    }
+
+    [Theory]
     [InlineData("https://flags.example.com", "https://flags.example.com")]
     [InlineData("https://flags.example.com:8443", "https://flags.example.com:8443")]
     // Written the way a person writes a URL. A correct value, so it is normalised rather than
@@ -314,6 +343,26 @@ public class SelfHostConfigurationTests
         public string ApplicationName { get; set; } = nameof(SelfHostConfigurationTests);
         public string ContentRootPath { get; set; } = AppContext.BaseDirectory;
         public IFileProvider ContentRootFileProvider { get; set; } = new NullFileProvider();
+    }
+
+    [Theory]
+    [InlineData("yes")]
+    [InlineData("1")]
+    [InlineData("on")]
+    public void ShouldApplyMigrations_RefusesAValueThatIsNotABoolean(string variable)
+    {
+        // Pinned because the auth service has to match it, not because .NET's binder is in doubt.
+        // One variable configures both, and the auth service reading "yes" as false while this one
+        // throws would skip the schema the server's own migration then puts a trigger on.
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                [SelfHostConfiguration.ApplyMigrationsVariable] = variable
+            })
+            .Build();
+
+        Assert.Throws<InvalidOperationException>(() =>
+            configuration.ShouldApplyMigrations(new StubEnvironment { EnvironmentName = Environments.Production }));
     }
 
     [Fact]
