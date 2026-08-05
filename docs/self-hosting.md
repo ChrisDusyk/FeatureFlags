@@ -52,6 +52,18 @@ The auth service refuses requests from an origin it does not trust, and nothing 
 startup — it fails at the first sign-in attempt, with an error that does not name the cause. If
 sign-in returns `INVALID_ORIGIN`, this is why.
 
+### Passwords that go into a URL
+
+`FEATUREFLAGS_DATABASE_URL` is a URL, so a password inside it has to be URL-safe. Generate one
+with `openssl rand -hex 24` rather than `-base64`: base64 output contains `/`, which ends the
+authority portion of a URL. Depending on what follows it, such a URL either fails to parse or —
+worse — parses into a connection with the wrong host, the wrong database, and no credentials at
+all.
+
+The server refuses both rather than acting on them, so this fails at startup with a message
+naming the cause instead of somewhere far away. If a password containing `/`, `@`, `:`, or `#`
+is unavoidable, percent-encode it: `p@ss/word` written as `p%40ss%2Fword` arrives intact.
+
 ## Architecture, and one rule
 
 ```

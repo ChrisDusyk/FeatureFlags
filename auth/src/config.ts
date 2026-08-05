@@ -105,6 +105,10 @@ const isProduction = process.env.NODE_ENV === 'production';
  * on `auth."user"`, so this has to have run before that one does. What enforces it is
  * the readiness check in server.ts, which stays 503 until the table exists.
  */
+// Parsed case-insensitively to match .NET's configuration binding on the server, which accepts
+// "True" as readily as "true". One variable configures both services, so a stricter reading here
+// would let `FEATUREFLAGS_APPLY_MIGRATIONS=True` migrate one schema and not the other — and the
+// half that skipped is the one the other depends on.
 export const applyMigrations = process.env.FEATUREFLAGS_APPLY_MIGRATIONS
-  ? process.env.FEATUREFLAGS_APPLY_MIGRATIONS === 'true'
+  ? process.env.FEATUREFLAGS_APPLY_MIGRATIONS.trim().toLowerCase() === 'true'
   : !isProduction;

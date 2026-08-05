@@ -33,6 +33,13 @@ public static class SelfHostConfiguration
     private const int DefaultPostgresPort = 5432;
     private const int DefaultRedisPort = 6379;
 
+    private const string UnparseableDatabaseUrl =
+        $"{DatabaseUrlVariable} is not a valid postgres:// URL. The usual cause is an unescaped " +
+        "character in the password — '/', '@', ':' and '#' each have a meaning in a URL and have " +
+        "to be percent-encoded ('/' as %2F, '@' as %40). Generating the password with " +
+        "`openssl rand -hex 24` avoids the problem; `-base64` does not, because base64 contains " +
+        "'/'. A native Npgsql connection string is also accepted here instead.";
+
     public static TBuilder AddSelfHostConfiguration<TBuilder>(this TBuilder builder)
         where TBuilder : IHostApplicationBuilder
     {
@@ -107,9 +114,30 @@ public static class SelfHostConfiguration
     /// </summary>
     public static string ToNpgsqlConnectionString(string value)
     {
+        var looksLikeUrl =
+            value.StartsWith("postgres://", StringComparison.OrdinalIgnoreCase) ||
+            value.StartsWith("postgresql://", StringComparison.OrdinalIgnoreCase);
+
         if (!TryParseUrl(value, out var url, "postgres", "postgresql"))
         {
+            // Passing an unparseable postgres:// URL through to Npgsql would only move the
+            // failure somewhere less informative. Almost always an unescaped character in the
+            // password, so the message says so rather than describing URL syntax.
+            if (looksLikeUrl)
+            {
+                throw new InvalidOperationException(UnparseableDatabaseUrl);
+            }
+
             return value;
+        }
+
+        // A '/' in the password ends the authority early, and everything after it — including the
+        // '@' — lands in the path. The result still parses, into a connection with the wrong host,
+        // the wrong database, and no credentials whatsoever, which then fails somewhere with no
+        // trace of the cause. An '@' that did not become the userinfo delimiter is the tell.
+        if (url.UserInfo.Length == 0 && value.Contains('@'))
+        {
+            throw new InvalidOperationException(UnparseableDatabaseUrl);
         }
 
         var builder = new NpgsqlConnectionStringBuilder
@@ -157,8 +185,8 @@ public static class SelfHostConfiguration
     /// As with Postgres, anything else is passed through.
     ///
     /// A password containing a comma cannot survive this translation, because that is the
-    /// separator StackExchange.Redis uses and it offers no escape for it. Such a password has to
-    /// be given as a native configuration string.
+    /// separator StackExchange.Redis uses and it offers no escape for it. That case is rejected
+    /// rather than mangled — see below.
     /// </summary>
     public static string ToRedisConfiguration(string value)
     {
@@ -174,6 +202,18 @@ public static class SelfHostConfiguration
 
         if (password is not null)
         {
+            // Emitting this anyway would split the password at the comma and hand the first
+            // fragment to Redis, which fails to authenticate for a reason nothing on either side
+            // reports. Refusing outright is the only honest option, and it names the way out.
+            if (password.Contains(','))
+            {
+                throw new InvalidOperationException(
+                    $"{RedisUrlVariable} carries a password containing a comma, which is the separator " +
+                    "StackExchange.Redis uses to split its configuration and cannot be escaped. Set the " +
+                    "variable to a native StackExchange.Redis configuration string instead, or use a " +
+                    "password without a comma.");
+            }
+
             options.Add($"password={password}");
         }
 

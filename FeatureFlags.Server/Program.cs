@@ -45,9 +45,16 @@ builder.Services.Configure<ForwardedHeadersOptions>(options =>
 {
     options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
 
-    // The proxy is a neighbouring container or pod, not loopback, so the default known-proxy list
-    // would reject it. Trusting the hop is sound only because nothing else can reach this port:
-    // both deployment artifacts keep the server off the public network behind that proxy.
+    // Only the nearest hop is honoured, so a client cannot prepend its own entry and have it
+    // survive. Explicit because it is the security property this depends on, not because the
+    // default differs.
+    options.ForwardLimit = 1;
+
+    // The proxy is a neighbouring container or pod on an address assigned at run time, so there is
+    // no known-proxy list to write and the default one would reject it. What bounds the trust is
+    // the network rather than the header: both deployment artifacts keep the server unpublished
+    // behind the proxy, so nothing else can reach this port to spoof anything. Publishing the
+    // server's port directly breaks that assumption — do not.
     options.KnownIPNetworks.Clear();
     options.KnownProxies.Clear();
 });

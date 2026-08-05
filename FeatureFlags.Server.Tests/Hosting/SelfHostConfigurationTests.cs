@@ -69,6 +69,33 @@ public class SelfHostConfigurationTests
         Assert.Contains(SelfHostConfiguration.DatabaseUrlVariable, exception.Message);
     }
 
+    [Theory]
+    // Unparseable: the '/' ends the authority and 'ab' is not a port.
+    [InlineData("postgres://flags:ab/cd@db.example.com:5432/featureflagsdb")]
+    // Worse — this one parses, into host 'flags', port 12, no credentials at all, and a database
+    // named 'xyz@db.example.com:5432/featureflagsdb'. Left alone it fails far from the cause.
+    [InlineData("postgres://flags:12/xyz@db.example.com:5432/featureflagsdb")]
+    public void ToNpgsqlConnectionString_RejectsAPasswordThatBreaksTheUrl(string url)
+    {
+        // Generating a password with `openssl rand -base64` produces exactly this, because base64
+        // contains '/'. The advice to use hex lives in the message.
+        var exception = Assert.Throws<InvalidOperationException>(() =>
+            SelfHostConfiguration.ToNpgsqlConnectionString(url));
+
+        Assert.Contains(SelfHostConfiguration.DatabaseUrlVariable, exception.Message);
+        Assert.Contains("percent-encoded", exception.Message);
+    }
+
+    [Fact]
+    public void ToNpgsqlConnectionString_AcceptsAPercentEncodedPassword()
+    {
+        var settings = Parse(SelfHostConfiguration.ToNpgsqlConnectionString(
+            "postgres://flags:ab%2Fcd@db.example.com:5432/featureflagsdb"));
+
+        Assert.Equal("ab/cd", settings["Password"]);
+        Assert.Equal("db.example.com", settings["Host"]);
+    }
+
     [Fact]
     public void ToNpgsqlConnectionString_PassesANativeConnectionStringThrough()
     {
@@ -86,6 +113,18 @@ public class SelfHostConfigurationTests
     public void ToRedisConfiguration_TranslatesARedisUrl(string url, string expected)
     {
         Assert.Equal(expected, SelfHostConfiguration.ToRedisConfiguration(url));
+    }
+
+    [Fact]
+    public void ToRedisConfiguration_RejectsAPasswordContainingItsSeparator()
+    {
+        // Emitting this would split the password at the comma and authenticate with the first
+        // fragment, which fails for a reason neither side reports.
+        var exception = Assert.Throws<InvalidOperationException>(() =>
+            SelfHostConfiguration.ToRedisConfiguration("redis://:se,cret@cache.example.com"));
+
+        Assert.Contains(SelfHostConfiguration.RedisUrlVariable, exception.Message);
+        Assert.Contains("comma", exception.Message);
     }
 
     [Fact]
@@ -144,6 +183,12 @@ public class SelfHostConfigurationTests
     [InlineData("Production", null, false)]
     [InlineData("Production", "true", true)]
     [InlineData("Development", "false", false)]
+    // Case-insensitive, which the auth service's own parsing has to match: one variable
+    // configures both, and a "True" that only half of them honoured would migrate one schema
+    // and not the other — the half that skipped being the one the other depends on.
+    [InlineData("Production", "True", true)]
+    [InlineData("Production", "TRUE", true)]
+    [InlineData("Development", "False", false)]
     public void ShouldApplyMigrations_DefaultsToDevelopmentAndIsOverridable(
         string environmentName,
         string? variable,
