@@ -26,6 +26,40 @@ export interface DatabaseSettings {
   database: string;
 }
 
+/**
+ * A boolean the .NET server reads from the same variable, so it is read the same way.
+ *
+ * Case-insensitively, because .NET's configuration binding takes "True" as readily as "true",
+ * and one variable configuring both services means a stricter reading here would migrate one
+ * schema and not the other. Strictly otherwise, for the same reason inverted: .NET *throws* on
+ * a value that is not a boolean, so treating "yes" or "1" as false would have this service
+ * quietly skip the schema while the server refused to start at all — over one value, set once,
+ * meant for both.
+ */
+function readBoolean(name: string, fallback: boolean): boolean {
+  const value = process.env[name]?.trim();
+
+  // Unset and empty are the same thing to .NET's binder: absent, so the default applies.
+  if (!value) {
+    return fallback;
+  }
+
+  const normalised = value.toLowerCase();
+
+  if (normalised === 'true') {
+    return true;
+  }
+
+  if (normalised === 'false') {
+    return false;
+  }
+
+  throw new Error(
+    `${name} has to be true or false — got "${value}". The .NET server reads this same variable ` +
+      'and refuses anything else, so a value it rejects cannot be one this service acts on.',
+  );
+}
+
 function required(name: string): string {
   const value = process.env[name];
 
@@ -133,10 +167,4 @@ const isProduction = process.env.NODE_ENV === 'production';
  * on `auth."user"`, so this has to have run before that one does. What enforces it is
  * the readiness check in server.ts, which stays 503 until the table exists.
  */
-// Parsed case-insensitively to match .NET's configuration binding on the server, which accepts
-// "True" as readily as "true". One variable configures both services, so a stricter reading here
-// would let `FEATUREFLAGS_APPLY_MIGRATIONS=True` migrate one schema and not the other — and the
-// half that skipped is the one the other depends on.
-export const applyMigrations = process.env.FEATUREFLAGS_APPLY_MIGRATIONS
-  ? process.env.FEATUREFLAGS_APPLY_MIGRATIONS.trim().toLowerCase() === 'true'
-  : !isProduction;
+export const applyMigrations = readBoolean('FEATUREFLAGS_APPLY_MIGRATIONS', !isProduction);
