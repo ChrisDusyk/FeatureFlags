@@ -96,6 +96,21 @@ public class SelfHostConfigurationTests
         Assert.Equal("db.example.com", settings["Host"]);
     }
 
+    [Theory]
+    // A plausible way to mistype `?sslmode=require`. Dropped silently, it would leave the
+    // connection unencrypted with nothing anywhere saying so.
+    [InlineData("postgres://flags:s3cret@db.example.com/featureflagsdb?sslmode", "sslmode")]
+    [InlineData("postgres://flags:s3cret@db.example.com/featureflagsdb?sslmode=require&pooling", "pooling")]
+    [InlineData("postgres://flags:s3cret@db.example.com/featureflagsdb?=require", "=require")]
+    public void ToNpgsqlConnectionString_RejectsAQuerySegmentThatIsNotNameValue(string url, string segment)
+    {
+        var exception = Assert.Throws<InvalidOperationException>(() =>
+            SelfHostConfiguration.ToNpgsqlConnectionString(url));
+
+        Assert.Contains(SelfHostConfiguration.DatabaseUrlVariable, exception.Message);
+        Assert.Contains(segment, exception.Message);
+    }
+
     [Fact]
     public void ToNpgsqlConnectionString_PassesANativeConnectionStringThrough()
     {

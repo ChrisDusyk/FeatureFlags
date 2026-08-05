@@ -275,10 +275,19 @@ public static class SelfHostConfiguration
         {
             var separator = pair.IndexOf('=');
 
-            if (separator > 0)
+            // Skipping a segment that is not name=value would put back exactly the behaviour the
+            // rest of this method exists to avoid: `?sslmode` is a plausible way to mistype
+            // `?sslmode=require`, and dropping it leaves the connection unencrypted with nothing
+            // said about it.
+            if (separator <= 0)
             {
-                yield return (Unescape(pair[..separator]), Unescape(pair[(separator + 1)..]));
+                throw new InvalidOperationException(
+                    $"{DatabaseUrlVariable} carries the query segment '{pair}', which is not in name=value form. " +
+                    "Write it as name=value, remove it, or set the variable to a native Npgsql connection " +
+                    "string instead.");
             }
+
+            yield return (Unescape(pair[..separator]), Unescape(pair[(separator + 1)..]));
         }
     }
 
