@@ -53,6 +53,9 @@ Nearly always `FEATUREFLAGS_ORIGIN` not matching the URL actually in the browser
 `https://` versus `http://`, or a `www.` that is really there. The auth service rejects requests
 from an origin it does not trust, and the failure surfaces at sign-in rather than at startup.
 
+Startup catches only the shapes that could never match anything: a missing scheme, or a path on
+the end. A wrong hostname is a perfectly well-formed origin, so it gets this far.
+
 Check what the service was given, and that it matches exactly:
 
 ```sh

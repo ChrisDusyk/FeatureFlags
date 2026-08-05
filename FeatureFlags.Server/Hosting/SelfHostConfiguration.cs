@@ -33,6 +33,17 @@ public static class SelfHostConfiguration
     private const int DefaultPostgresPort = 5432;
     private const int DefaultRedisPort = 6379;
 
+    private const string OriginIsNotAnOrigin =
+        $"{OriginVariable} has to start with https:// or http://, e.g. https://flags.example.com. " +
+        "It is the origin a browser sends, not a hostname — the auth service compares it against " +
+        "the Origin header on every sign-in, and a value that is not an origin matches nothing.";
+
+    private const string OriginCarriesMoreThanAnOrigin =
+        $"{OriginVariable} has to be a scheme, a host, and an optional port, with nothing after " +
+        "it. A browser never puts a path, a query, or a fragment in an Origin header, so this " +
+        "would be refused at the first sign-in with an error naming only the origin. If the " +
+        "console has to live under a path, that belongs in the proxy in front of this, not here.";
+
     private const string UnparseableDatabaseUrl =
         $"{DatabaseUrlVariable} is not a valid postgres:// URL — the scheme is not the problem, " +
         "postgresql:// is equally accepted. The usual cause is an unescaped " +
@@ -58,6 +69,16 @@ public static class SelfHostConfiguration
         Translate(builder.Configuration, translated, CacheConnectionStringKey, RedisUrlVariable, ToRedisConfiguration);
         Translate(builder.Configuration, translated, AuthServiceAddressKey, AuthUrlVariable, address => address.TrimEnd('/'));
 
+        // Checked here even though this service only reads it as a yes/no, because this is the
+        // one process that reads the value at all in the compose bundle. The Helm chart refuses
+        // the same shapes while templating; compose has nowhere to do that, so a value that
+        // could only ever fail arrives intact and its consequence lands on a stranger trying to
+        // sign in. Startup is the last place left to say so.
+        if (builder.Configuration[OriginVariable] is { Length: > 0 } origin)
+        {
+            translated[OriginVariable] = NormaliseConsoleOrigin(origin.Trim());
+        }
+
         if (translated.Count > 0)
         {
             builder.Configuration.AddInMemoryCollection(translated);
@@ -73,6 +94,36 @@ public static class SelfHostConfiguration
     /// </summary>
     public static string? GetConsoleOrigin(this IConfiguration configuration) =>
         configuration[OriginVariable] is { Length: > 0 } origin ? origin : null;
+
+    /// <summary>
+    /// Checks that a configured origin is one, and removes a trailing slash.
+    ///
+    /// What this cannot check is the thing most likely to be wrong — whether the value matches
+    /// the URL in someone's address bar. It can check that no value would: a hostname with no
+    /// scheme, or an origin carrying a path, never appears in an <c>Origin</c> header, so it
+    /// cannot match whatever the browser sends. Those fail here rather than at a first sign-in
+    /// that reports only <c>INVALID_ORIGIN</c>.
+    ///
+    /// A trailing slash is different in kind: it is a correct value written the way a person
+    /// writes a URL, so it is normalised rather than rejected.
+    /// </summary>
+    public static string NormaliseConsoleOrigin(string value)
+    {
+        var origin = value.TrimEnd('/');
+
+        if (!Uri.TryCreate(origin, UriKind.Absolute, out var url) || url.Scheme is not ("http" or "https"))
+        {
+            throw new InvalidOperationException(OriginIsNotAnOrigin);
+        }
+
+        // Uri reports an absent path as "/", so that is the empty case rather than "".
+        if (url.AbsolutePath is not "/" || url.Query.Length > 0 || url.Fragment.Length > 0)
+        {
+            throw new InvalidOperationException(OriginCarriesMoreThanAnOrigin);
+        }
+
+        return origin;
+    }
 
     /// <summary>
     /// Whether to bring the database up to the latest migration during startup.

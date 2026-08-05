@@ -222,6 +222,55 @@ public class SelfHostConfigurationTests
         Assert.Equal("http://localhost:41234", configuration["services:auth:http:0"]);
     }
 
+    [Theory]
+    [InlineData("https://flags.example.com", "https://flags.example.com")]
+    [InlineData("https://flags.example.com:8443", "https://flags.example.com:8443")]
+    // Written the way a person writes a URL. A correct value, so it is normalised rather than
+    // refused — a browser's Origin header never carries the slash.
+    [InlineData("https://flags.example.com/", "https://flags.example.com")]
+    [InlineData("http://localhost:18080/", "http://localhost:18080")]
+    public void NormaliseConsoleOrigin_AcceptsAnOriginAndDropsATrailingSlash(string value, string expected)
+    {
+        Assert.Equal(expected, SelfHostConfiguration.NormaliseConsoleOrigin(value));
+    }
+
+    [Theory]
+    // A hostname is not an origin, and neither is a host:port — Uri reads the latter as a scheme.
+    [InlineData("flags.example.com")]
+    [InlineData("localhost:18080")]
+    // The console's URL rather than its origin. Renders fine everywhere and matches nothing.
+    [InlineData("https://flags.example.com/console")]
+    [InlineData("https://flags.example.com?tenant=acme")]
+    [InlineData("https://flags.example.com#top")]
+    public void NormaliseConsoleOrigin_RejectsWhatABrowserWouldNeverSend(string value)
+    {
+        // Not a matter of taste: no browser puts any of these in an Origin header, so the auth
+        // service could never match one. Refusing at startup beats INVALID_ORIGIN at a stranger's
+        // first sign-in, which is the only other place it would be noticed.
+        var exception = Assert.Throws<InvalidOperationException>(() =>
+            SelfHostConfiguration.NormaliseConsoleOrigin(value));
+
+        Assert.Contains(SelfHostConfiguration.OriginVariable, exception.Message);
+    }
+
+    [Fact]
+    public void AddSelfHostConfiguration_ChecksTheOriginAndNormalisesIt()
+    {
+        // The compose bundle has nowhere else to check it: the chart refuses these while
+        // templating, and startup is the equivalent moment for a value read from a .env file.
+        Assert.Throws<InvalidOperationException>(() => Build(new Dictionary<string, string?>
+        {
+            [SelfHostConfiguration.OriginVariable] = "https://flags.example.com/console"
+        }));
+
+        var configuration = Build(new Dictionary<string, string?>
+        {
+            [SelfHostConfiguration.OriginVariable] = "https://flags.example.com/"
+        });
+
+        Assert.Equal("https://flags.example.com", configuration.GetConsoleOrigin());
+    }
+
     [Fact]
     public void AddSelfHostConfiguration_AddsNothingWhenNoVariablesAreSet()
     {

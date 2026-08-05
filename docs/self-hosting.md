@@ -48,9 +48,15 @@ its address bar **exactly** — scheme, hostname, and port:
 - `https://flags.example.com` and `https://www.flags.example.com` are different origins.
 - `http://localhost` and `http://localhost:8080` are different origins.
 
-The auth service refuses requests from an origin it does not trust, and nothing checks this at
-startup — it fails at the first sign-in attempt, with an error that does not name the cause. If
-sign-in returns `INVALID_ORIGIN`, this is why.
+Startup checks the shape and nothing more: a value with no scheme, or one carrying a path, a
+query, or a fragment, is refused where it is set, because no browser sends such a thing in an
+`Origin` header and so no such value could ever match. The Helm chart refuses the same shapes
+while templating, before anything is installed.
+
+What that cannot check is the mistake above — whether the origin matches the address bar. Those
+values are all well-formed, the auth service simply refuses requests from an origin it does not
+trust, and the failure surfaces at the first sign-in attempt with an error that does not name the
+cause. If sign-in returns `INVALID_ORIGIN`, this is why.
 
 ### Passwords that go into a URL
 
