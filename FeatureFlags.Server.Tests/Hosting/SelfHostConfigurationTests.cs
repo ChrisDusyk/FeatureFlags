@@ -127,12 +127,31 @@ public class SelfHostConfigurationTests
         Assert.Contains(segment, exception.Message);
     }
 
-    [Fact]
-    public void ToNpgsqlConnectionString_PassesANativeConnectionStringThrough()
+    [Theory]
+    [InlineData("Host=db.example.com;Username=flags;Password=s3cret;Database=featureflagsdb")]
+    [InlineData("mysql://flags:s3cret@db.example.com/featureflagsdb")]
+    public void ToNpgsqlConnectionString_RejectsAnythingThatIsNotAPostgresUrl(string value)
     {
-        const string native = "Host=db.example.com;Username=flags;Password=s3cret;Database=featureflagsdb";
+        // The auth service reads this same variable and parses it with `new URL()`. Accepting a
+        // format only this service understands would start the server and crashloop the auth
+        // container, which is a worse outcome than refusing the value where it is set.
+        var exception = Assert.Throws<InvalidOperationException>(() =>
+            SelfHostConfiguration.ToNpgsqlConnectionString(value));
 
-        Assert.Equal(native, SelfHostConfiguration.ToNpgsqlConnectionString(native));
+        Assert.Contains(SelfHostConfiguration.DatabaseUrlVariable, exception.Message);
+        Assert.Contains("postgres://", exception.Message);
+    }
+
+    [Fact]
+    public void ToNpgsqlConnectionString_KeepsNpgsqlSettingsReachableAsQueryParameters()
+    {
+        // What makes refusing a native connection string cost nothing: the URL form reaches the
+        // same settings, so there is no configuration that only the rejected format could express.
+        var settings = Parse(SelfHostConfiguration.ToNpgsqlConnectionString(
+            "postgres://flags:s3cret@db.example.com/featureflagsdb?Timeout=30&Maximum%20Pool%20Size=50"));
+
+        Assert.Equal("30", settings["Timeout"]);
+        Assert.Equal("50", settings["Maximum Pool Size"]);
     }
 
     [Theory]

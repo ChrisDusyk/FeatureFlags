@@ -47,7 +47,23 @@ function readDatabaseSettings(): DatabaseSettings {
   const uri = process.env.FEATUREFLAGSDB_URI ?? process.env.FEATUREFLAGS_DATABASE_URL;
 
   if (uri) {
-    const parsed = new URL(uri);
+    // `new URL()` on something that is not one throws a TypeError naming neither the variable
+    // nor what was wrong with it, and this runs at import: the container would exit on a stack
+    // trace with no way back to the value that caused it. The server rejects the same input for
+    // the same reason, so whichever half of the stack starts first says the same thing.
+    let parsed: URL;
+
+    try {
+      parsed = new URL(uri);
+    } catch {
+      const name = process.env.FEATUREFLAGSDB_URI ? 'FEATUREFLAGSDB_URI' : 'FEATUREFLAGS_DATABASE_URL';
+
+      throw new Error(
+        `${name} has to be a postgres:// URL, e.g. postgres://user:password@host:5432/featureflagsdb. ` +
+          'The .NET server reads this same variable, so both accept the one format. A password ' +
+          "containing '/', '@', ':' or '#' has to be percent-encoded ('/' as %2F, '@' as %40).",
+      );
+    }
 
     return {
       host: parsed.hostname,

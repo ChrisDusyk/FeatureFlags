@@ -32,7 +32,7 @@ Both services read the same names, so one value configures both where they share
 | Variable | Used by | |
 |---|---|---|
 | `FEATUREFLAGS_ORIGIN` | both | **Required.** The origin a browser loads the console on, scheme and port included. |
-| `FEATUREFLAGS_DATABASE_URL` | both | `postgres://user:password@host:5432/featureflagsdb`. A native Npgsql connection string also works. |
+| `FEATUREFLAGS_DATABASE_URL` | both | `postgres://user:password@host:5432/featureflagsdb`. Npgsql's own settings work as query parameters. |
 | `BETTER_AUTH_SECRET` | auth | **Required.** Signs sessions and tokens. `openssl rand -base64 32`. |
 | `FEATUREFLAGS_REDIS_URL` | server | `redis://host:6379`. |
 | `FEATUREFLAGS_AUTH_URL` | server | The auth service's in-network address, e.g. `http://auth:8080`. |
@@ -63,6 +63,11 @@ all.
 The server refuses both rather than acting on them, so this fails at startup with a message
 naming the cause instead of somewhere far away. If a password containing `/`, `@`, `:`, or `#`
 is unavoidable, percent-encode it: `p@ss/word` written as `p%40ss%2Fword` arrives intact.
+
+That it has to be a URL at all is not a house style. The auth service is Node and parses this
+same variable with `new URL()`, so a format only the .NET server understands would start one
+half of the stack and crashloop the other — and the server refuses those too, for that reason.
+Anything Npgsql accepts is reachable as a query parameter, so nothing is out of reach.
 
 ## Architecture, and one rule
 

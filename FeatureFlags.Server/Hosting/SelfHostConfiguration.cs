@@ -37,8 +37,16 @@ public static class SelfHostConfiguration
         $"{DatabaseUrlVariable} is not a valid postgres:// URL. The usual cause is an unescaped " +
         "character in the password — '/', '@', ':' and '#' each have a meaning in a URL and have " +
         "to be percent-encoded ('/' as %2F, '@' as %40). Generating the password with " +
-        "`openssl rand -hex 24` avoids the problem; `-base64` does not, because base64 contains " +
-        "'/'. A native Npgsql connection string is also accepted here instead.";
+        "`openssl rand -hex 24` avoids the problem; `-base64` does not, because base64 contains '/'.";
+
+    private const string DatabaseUrlIsNotAUrl =
+        $"{DatabaseUrlVariable} has to be a postgres:// URL, e.g. " +
+        "postgres://user:password@host:5432/featureflagsdb. The auth service reads this same " +
+        "variable and parses it as a URL, so anything else configures half the stack and " +
+        "crashloops the other half. Npgsql's own settings work here as query parameters " +
+        "(?sslmode=require). If a native Npgsql connection string is genuinely needed, set " +
+        "ConnectionStrings__featureflagsdb directly — that one is read by this service alone, " +
+        "and the auth service then has to be pointed at the database separately.";
 
     public static TBuilder AddSelfHostConfiguration<TBuilder>(this TBuilder builder)
         where TBuilder : IHostApplicationBuilder
@@ -108,9 +116,13 @@ public static class SelfHostConfiguration
     }
 
     /// <summary>
-    /// Turns a <c>postgres://</c> URL into the keyword-value string Npgsql expects. Anything that
-    /// is not such a URL is passed through untouched, so an operator who would rather write a
-    /// native connection string can.
+    /// Turns a <c>postgres://</c> URL into the keyword-value string Npgsql expects.
+    ///
+    /// Only such a URL is accepted, because this variable configures two services and the other
+    /// one is Node: <c>auth/src/config.ts</c> hands it to <c>new URL()</c>. A native Npgsql
+    /// connection string would start this server and crashloop the auth container on a
+    /// <c>TypeError</c> naming neither the variable nor the reason — the operator having been
+    /// told the value was fine. One shared variable can only have one accepted format.
     /// </summary>
     public static string ToNpgsqlConnectionString(string value)
     {
@@ -120,15 +132,10 @@ public static class SelfHostConfiguration
 
         if (!TryParseUrl(value, out var url, "postgres", "postgresql"))
         {
-            // Passing an unparseable postgres:// URL through to Npgsql would only move the
-            // failure somewhere less informative. Almost always an unescaped character in the
-            // password, so the message says so rather than describing URL syntax.
-            if (looksLikeUrl)
-            {
-                throw new InvalidOperationException(UnparseableDatabaseUrl);
-            }
-
-            return value;
+            // Two different mistakes, so two different messages: a postgres:// URL that will not
+            // parse is almost always an unescaped character in the password, while anything else
+            // is someone writing a format this variable does not take.
+            throw new InvalidOperationException(looksLikeUrl ? UnparseableDatabaseUrl : DatabaseUrlIsNotAUrl);
         }
 
         // A '/' in the password ends the authority early, and everything after it — including the
