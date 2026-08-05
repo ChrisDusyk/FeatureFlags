@@ -69,7 +69,9 @@ postgres:
   storage: 8Gi
   storageClassName: ""
   # Only used when bundled. Generate a URL-safe one — `openssl rand -hex 24`, not base64: this
-  # goes into a postgres:// URL, and a '/' in it would end the authority early.
+  # goes into a postgres:// URL, and a '/' in it would end the authority early. The chart
+  # percent-encodes it, so an awkward password does work here — but the same one written into
+  # `external.url` or the compose bundle by hand is not escaped for you.
   #
   # There is no `existingSecret` for the bundled database on purpose. The connection URL is
   # composed from this password while templating, so it cannot come from a Secret the chart

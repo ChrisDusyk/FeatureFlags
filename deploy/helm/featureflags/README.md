@@ -5,10 +5,16 @@ helm install featureflags oci://ghcr.io/chrisdusyk/charts/featureflags \
   --namespace featureflags --create-namespace \
   --set origin=https://flags.example.com \
   --set betterAuth.secret="$(openssl rand -base64 32)" \
-  --set postgres.password="$(openssl rand -base64 24)"
+  --set postgres.password="$(openssl rand -hex 24)"
 ```
 
 Then open the origin and create an account. **The first account to sign up becomes the admin.**
+
+The two are generated differently on purpose. The database password is interpolated into a
+`postgres://` URL, and base64 output contains `/`, which ends the authority portion of one. This
+chart percent-encodes it, so base64 would survive here — but the same password copied into
+`postgres.external.url`, a `psql` invocation, or the compose bundle is not escaped for you, and
+hex avoids the question everywhere. The auth secret never goes into a URL.
 
 Putting secrets on the command line leaves them in your shell history. For anything real, create
 a Secret yourself and point `betterAuth.existingSecret` at it.
