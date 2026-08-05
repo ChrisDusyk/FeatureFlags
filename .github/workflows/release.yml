@@ -154,6 +154,13 @@ jobs:
           mkdir -p dist
           tar czf "dist/featureflags-compose-${{ needs.version.outputs.version }}.tar.gz" \
             -C deploy compose
+
+          # And again under a fixed name, because `releases/latest/download/<asset>` resolves an
+          # exact filename and nothing else. That URL is the quickstart's first command, so
+          # without this it 404s on every release — the versioned copy is what people archive,
+          # this one is what they curl.
+          cp "dist/featureflags-compose-${{ needs.version.outputs.version }}.tar.gz" \
+            dist/featureflags-compose.tar.gz
           cp artifacts/openapi/openapi.json dist/
           cp artifacts/chart/*.tgz dist/
 
