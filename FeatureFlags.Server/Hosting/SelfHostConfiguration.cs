@@ -34,13 +34,14 @@ public static class SelfHostConfiguration
     private const int DefaultRedisPort = 6379;
 
     private const string UnparseableDatabaseUrl =
-        $"{DatabaseUrlVariable} is not a valid postgres:// URL. The usual cause is an unescaped " +
+        $"{DatabaseUrlVariable} is not a valid postgres:// URL — the scheme is not the problem, " +
+        "postgresql:// is equally accepted. The usual cause is an unescaped " +
         "character in the password — '/', '@', ':' and '#' each have a meaning in a URL and have " +
         "to be percent-encoded ('/' as %2F, '@' as %40). Generating the password with " +
         "`openssl rand -hex 24` avoids the problem; `-base64` does not, because base64 contains '/'.";
 
     private const string DatabaseUrlIsNotAUrl =
-        $"{DatabaseUrlVariable} has to be a postgres:// URL, e.g. " +
+        $"{DatabaseUrlVariable} has to be a postgres:// or postgresql:// URL, e.g. " +
         "postgres://user:password@host:5432/featureflagsdb. The auth service reads this same " +
         "variable and parses it as a URL, so anything else configures half the stack and " +
         "crashloops the other half. Npgsql's own settings work here as query parameters " +

@@ -76,6 +76,9 @@ public class SelfHostConfigurationTests
     // Worse — this one parses, into host 'flags', port 12, no credentials at all, and a database
     // named 'xyz@db.example.com:5432/featureflagsdb'. Left alone it fails far from the cause.
     [InlineData("postgres://flags:12/xyz@db.example.com:5432/featureflagsdb")]
+    // The other accepted scheme reaches the same message rather than the wrong-format one, which
+    // is what stops an operator whose provider hands out postgresql:// from suspecting the scheme.
+    [InlineData("postgresql://flags:ab/cd@db.example.com:5432/featureflagsdb")]
     public void ToNpgsqlConnectionString_RejectsAPasswordThatBreaksTheUrl(string url)
     {
         // Generating a password with `openssl rand -base64` produces exactly this, because base64
