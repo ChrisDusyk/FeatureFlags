@@ -60,7 +60,7 @@ Domain code that can meaningfully return "nothing" (e.g. repository lookups) ret
 dotnet ef migrations add <Name> --project FeatureFlags.Infrastructure --output-dir Persistence/Migrations
 ```
 
-`AppDbContextFactory` supplies a design-time connection string so the CLI can build the model without Aspire. In Development the server applies pending migrations at startup via `ApplyMigrationsAsync()`; deployed environments should migrate as a deliberate step instead.
+`AppDbContextFactory` supplies a design-time connection string so the CLI can build the model without Aspire. `ApplyMigrationsAsync()` runs during startup when `FEATUREFLAGS_APPLY_MIGRATIONS` says so — defaulting to on in Development, which is what the AppHost relies on. It takes a Postgres advisory lock, so two servers starting together serialise instead of racing; that makes the in-process path safe at one replica, not a substitute for migrating deliberately when there are several. `FEATUREFLAGS_MIGRATE_ONLY=true` migrates and then exits, which is how the Helm chart's job orders it.
 
 **The `AddUsersMirror` migration depends on `auth."user"` already existing**, because it puts a trigger on it. That is why `AppHost.cs` has the server `WaitFor(auth)` — running `dotnet ef database update` against a database the auth service has never touched will fail.
 
@@ -81,8 +81,8 @@ browser ──▶ /api/auth/*  ──▶ server (YARP forwarder) ──▶ auth 
 - **The first account to sign up becomes the admin** (a `databaseHooks.user.create.before` hook in `auth/src/auth.ts`); everyone after it is a `user`. There is no seeded credential.
 - **The issuer and audience are fixed strings**, not URLs — `auth/src/config.ts` and `AuthenticationExtensions` must agree on them, and neither needs changing when a hostname does.
 - **Trusted origins have to cover Aspire's `<resource>-<app>.dev.localhost` hostnames**, which is what a browser actually loads — the bare `localhost:<port>` URLs are internal. Testing the auth path with the internal URL passes the origin check while the browser fails it, so reproduce against the external URL from `aspire describe`.
-- The auth service applies its own migrations at startup outside production, mirroring `ApplyMigrationsAsync()`. It uses `getMigrations` from `better-auth/db/migration`, which reconciles the live schema against the plugin configuration rather than replaying versioned files — so adding a plugin is all it takes to change the schema.
-- **Its `/health` probes for `auth."user"`, not just database reachability.** Because the server waits on that health check and its own migration puts a trigger on that table, reporting healthy too early would let the server start and then fail to migrate. In a deployed environment the auth service therefore stays unhealthy until its migrations have been run as a deliberate step.
+- The auth service applies its own migrations at startup on the same terms as the server (`FEATUREFLAGS_APPLY_MIGRATIONS`, defaulting to on outside production), and `pnpm migrate` runs the same work as a step that can be ordered. It uses `getMigrations` from `better-auth/db/migration`, which reconciles the live schema against the plugin configuration rather than replaying versioned files — so adding a plugin is all it takes to change the schema.
+- **Its `/health` probes for `auth."user"`, not just database reachability.** Because the server waits on that health check and its own migration puts a trigger on that table, reporting healthy too early would let the server start and then fail to migrate. That check is what orders the two migrations in the compose bundle, with no orchestration involved — so do not weaken it to a `SELECT 1`.
 - `BETTER_AUTH_SECRET` is an Aspire parameter; set it locally with `dotnet user-secrets set "Parameters:auth-secret" <value>` in `FeatureFlags.AppHost`. Publishing also requires a `console-origin` parameter, which is the origin the browser sees.
 - `pnpm build` in `auth/` type-checks and compiles to `dist/`. Node runs the TypeScript in `src/` directly in development, so nothing there may rely on TypeScript emitting code (`erasableSyntaxOnly` enforces it).
 
@@ -109,3 +109,16 @@ The admin console (`frontend/`) is a React Router SPA that mirrors the backend's
 ## Running the app
 
 Use the Aspire CLI (see the `aspire` skill) rather than `dotnet run` directly — it starts the AppHost, Postgres, Redis, the auth service, the server, and the Vite frontend together, and exposes the dashboard for logs/traces.
+
+## Deployment
+
+`deploy/` holds what a self-hoster runs: a Docker Compose bundle for a single host and a Helm chart for Kubernetes, both consuming `featureflags-server` and `featureflags-auth` images from GHCR. See `docs/self-hosting.md`.
+
+**Those artifacts are hand-authored, and the AppHost is the development loop — they are not generated from each other, so a change to the resource graph has to be made in both.** Adding an environment variable, a dependency, or a service to `AppHost.cs` means changing `deploy/compose/docker-compose.yml` and the chart's templates too. That duplication is deliberate: the compose file and `values.yaml` are a documented product surface with defaults chosen for a stranger, which is not what `aspire publish` emits.
+
+- **The consumer-facing configuration surface is `FEATUREFLAGS_*`,** translated into the Aspire keys the code actually reads by `FeatureFlags.Server/Hosting/SelfHostConfiguration.cs`. It fills only keys that are unset, so Aspire always wins under the AppHost. Add a new setting there rather than making a consumer learn `ConnectionStrings__featureflagsdb` or `services__auth__http__0`.
+- **`FEATUREFLAGS_ORIGIN` is one value on purpose.** It drives Caddy's site address, `BETTER_AUTH_URL`, `BETTER_AUTH_TRUSTED_ORIGINS`, and the ingress host. They have to agree, and a mismatch fails at somebody's first sign-in rather than at startup — keep them derived from the one value rather than configured separately. Its *shape* is checked where it is set (`NormaliseConsoleOrigin` at startup, `featureflags.origin` while templating): a missing scheme or a trailing path can never match an `Origin` header, so those are refused rather than deployed. Whether the hostname is the right one is not checkable, and that is the distinction to keep — do not "improve" either check into rejecting well-formed origins.
+- **Health endpoints are mapped in every environment** (`Extensions.cs`). They were Development-only, which meant `/health` fell through to `MapFallbackToFile` in Production and answered 200 with the console's HTML — a probe passing falsely. Do not put that gate back.
+- **The auth service must never be exposed directly** — no published port, no ingress rule, in any artifact. Same origin through the server's forwarder is what keeps the session cookie first-party.
+- Images build with `docker build -f FeatureFlags.Server/Dockerfile .` (context is the repository root, because it builds the console too) and `docker build auth/`. The server's runtime image is chiseled: no shell, so no `HEALTHCHECK` and nothing to exec into.
+- A `v*` tag releases both images, the chart, and the OpenAPI document together (`.github/workflows/release.yml`). Client libraries version separately — see `clients/README.md`, which records why they cannot be written yet.

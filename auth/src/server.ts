@@ -2,7 +2,7 @@ import { serve } from '@hono/node-server';
 import { Hono } from 'hono';
 
 import { auth } from './auth.ts';
-import { authSchema, isProduction, port } from './config.ts';
+import { applyMigrations, authSchema, port } from './config.ts';
 import { pool } from './db.ts';
 import { applyAuthMigrations } from './migrate.ts';
 
@@ -40,7 +40,7 @@ app.get('/health', async (context) => {
 
 app.all('/api/auth/*', (context) => auth.handler(context.req.raw));
 
-if (!isProduction) {
+if (applyMigrations) {
   await applyAuthMigrations();
 }
 

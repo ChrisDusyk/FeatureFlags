@@ -1,0 +1,171 @@
+name: release
+
+# One tag releases the whole platform: both images, the chart, and the OpenAPI document the
+# client libraries are generated from. They move together because they are one deployable thing.
+#
+#   git tag v1.2.0 && git push origin v1.2.0
+#
+# Client libraries are the exception and release from their own tags — see sdk-release.yml.
+
+on:
+  push:
+    tags:
+      - "v*"
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+  packages: write
+
+env:
+  REGISTRY: ghcr.io
+
+jobs:
+  version:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.tag.outputs.version }}
+      owner: ${{ steps.tag.outputs.owner }}
+    steps:
+      - id: tag
+        run: |
+          echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+          # GHCR rejects an uppercase path, and GitHub owners can carry capitals.
+          echo "owner=${GITHUB_REPOSITORY_OWNER,,}" >> "$GITHUB_OUTPUT"
+
+  images:
+    needs: version
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - name: featureflags-server
+            dockerfile: FeatureFlags.Server/Dockerfile
+            context: .
+          - name: featureflags-auth
+            dockerfile: auth/Dockerfile
+            context: auth
+    steps:
+      - uses: actions/checkout@v4
+
+      # arm64 is not a nicety here: it is what the cheaper VPS instances and every Apple silicon
+      # machine actually are. Building only amd64 would exclude a large share of self-hosters.
+      - uses: docker/setup-qemu-action@v3
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ needs.version.outputs.owner }}/${{ matrix.name }}
+          tags: |
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=semver,pattern={{major}}
+            type=raw,value=latest,enable=${{ !contains(github.ref_name, '-') }}
+
+      - uses: docker/build-push-action@v6
+        with:
+          context: ${{ matrix.context }}
+          file: ${{ matrix.dockerfile }}
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          build-args: |
+            VERSION=${{ needs.version.outputs.version }}
+          cache-from: type=gha,scope=${{ matrix.name }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.name }}
+
+  chart:
+    needs: version
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: azure/setup-helm@v4
+
+      - name: Package and push the chart
+        run: |
+          helm package deploy/helm/featureflags \
+            --version "${{ needs.version.outputs.version }}" \
+            --app-version "${{ needs.version.outputs.version }}" \
+            --destination dist
+
+          helm registry login ${{ env.REGISTRY }} \
+            --username ${{ github.actor }} \
+            --password ${{ secrets.GITHUB_TOKEN }}
+
+          helm push "dist/featureflags-${{ needs.version.outputs.version }}.tgz" \
+            "oci://${{ env.REGISTRY }}/${{ needs.version.outputs.owner }}/charts"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: chart
+          path: dist/*.tgz
+
+  openapi:
+    needs: version
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "10.0.x"
+
+      # Generating the document runs the application far enough to build its service provider,
+      # which will not start without the auth service's address. The value is never dialled —
+      # only the JWKS client would, and it is not used here.
+      - name: Generate the OpenAPI document
+        env:
+          FEATUREFLAGS_AUTH_URL: http://localhost
+        run: |
+          dotnet build FeatureFlags.Server/FeatureFlags.Server.csproj \
+            --configuration Release \
+            -p:OpenApiGenerateDocumentsOnBuild=true
+
+          mv openapi/FeatureFlags.Server.json openapi/openapi.json
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: openapi
+          path: openapi/openapi.json
+
+  publish:
+    needs: [version, images, chart, openapi]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      # The compose bundle is a release asset rather than something to clone the repository for:
+      # self-hosting should not require a git checkout.
+      - name: Assemble the compose bundle
+        run: |
+          mkdir -p dist
+          tar czf "dist/featureflags-compose-${{ needs.version.outputs.version }}.tar.gz" \
+            -C deploy compose
+
+          # And again under a fixed name, because `releases/latest/download/<asset>` resolves an
+          # exact filename and nothing else. That URL is the quickstart's first command, so
+          # without this it 404s on every release — the versioned copy is what people archive,
+          # this one is what they curl.
+          cp "dist/featureflags-compose-${{ needs.version.outputs.version }}.tar.gz" \
+            dist/featureflags-compose.tar.gz
+          cp artifacts/openapi/openapi.json dist/
+          cp artifacts/chart/*.tgz dist/
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*
+          generate_release_notes: true
+          prerelease: ${{ contains(github.ref_name, '-') }}

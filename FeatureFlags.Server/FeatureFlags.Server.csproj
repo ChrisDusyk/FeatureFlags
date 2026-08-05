@@ -6,8 +6,27 @@
     <Nullable>enable</Nullable>
   </PropertyGroup>
 
+  <!--
+    The OpenAPI document is what the NuGet and npm client libraries are generated from, so it has
+    to exist as a file rather than only at /openapi/v1.json in Development.
+
+    Generating it means running the application far enough to build its service provider, which
+    needs the auth service's address — so it is off by default rather than slowing (and breaking)
+    every ordinary build. The release workflow opts in:
+
+      FEATUREFLAGS_AUTH_URL=http://localhost dotnet build -p:OpenApiGenerateDocumentsOnBuild=true
+  -->
+  <PropertyGroup>
+    <OpenApiDocumentsDirectory>$(MSBuildProjectDirectory)/../openapi</OpenApiDocumentsDirectory>
+    <OpenApiGenerateDocumentsOnBuild Condition="'$(OpenApiGenerateDocumentsOnBuild)' == ''">false</OpenApiGenerateDocumentsOnBuild>
+  </PropertyGroup>
+
   <ItemGroup>
     <PackageReference Include="Aspire.StackExchange.Redis.OutputCaching" Version="13.4.6" />
+    <PackageReference Include="Microsoft.Extensions.ApiDescription.Server" Version="10.0.10">
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+      <PrivateAssets>all</PrivateAssets>
+    </PackageReference>
     <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="10.0.10" />
     <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.8" />
     <!--

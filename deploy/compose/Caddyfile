@@ -1,0 +1,16 @@
+# One site, one upstream. Caddy terminates TLS and everything behind it speaks plain HTTP on a
+# network the host does not publish.
+#
+# The site address is the full origin rather than a bare hostname on purpose: an `https://` value
+# makes Caddy obtain a certificate automatically, and an `http://` one makes it serve plain — so
+# the same variable that tells the auth service which origin to trust also decides whether this
+# deployment is on TLS at all. Those two answers must never disagree.
+
+{$FEATUREFLAGS_ORIGIN} {
+	encode zstd gzip
+
+	# X-Forwarded-Proto and X-Forwarded-For are added by default, and the server is configured
+	# to read them — without that it would believe it was serving plain HTTP and hand out
+	# http:// Location headers on an https:// origin.
+	reverse_proxy server:8080
+}

@@ -1,0 +1,99 @@
+name: sdk-release
+
+# Client libraries release on their own tags, separately from the platform:
+#
+#   sdk-dotnet-v0.3.1   → FeatureFlags.Client on NuGet
+#   sdk-node-v0.3.1     → @featureflags/client on npm
+#
+# They version independently against a documented minimum server version, because an SDK churns
+# on a different clock than the platform — lockstep would mean a no-op package release on every
+# platform bump.
+#
+# Neither package exists yet. See clients/README.md: there is no machine credential and no
+# evaluation endpoint, so there is nothing yet for a client library to call. The jobs below fail
+# loudly rather than silently publishing nothing if a tag is pushed before that lands.
+
+on:
+  push:
+    tags:
+      - "sdk-dotnet-v*"
+      - "sdk-node-v*"
+
+permissions:
+  contents: read
+
+jobs:
+  dotnet:
+    if: startsWith(github.ref_name, 'sdk-dotnet-v')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check the package exists
+        run: |
+          if [ ! -d clients/dotnet ]; then
+            echo "::error::clients/dotnet does not exist yet — see clients/README.md."
+            exit 1
+          fi
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "10.0.x"
+
+      - name: Pack
+        run: |
+          VERSION="${GITHUB_REF_NAME#sdk-dotnet-v}"
+          dotnet pack clients/dotnet --configuration Release \
+            -p:MinVerVersionOverride="$VERSION" --output dist
+
+      - name: Push
+        env:
+          NUGET_API_KEY: ${{ secrets.NUGET_API_KEY }}
+        run: |
+          dotnet nuget push "dist/*.nupkg" \
+            --source https://api.nuget.org/v3/index.json \
+            --api-key "$NUGET_API_KEY" \
+            --skip-duplicate
+
+  node:
+    if: startsWith(github.ref_name, 'sdk-node-v')
+    runs-on: ubuntu-latest
+    # --provenance signs the package against this workflow run, and the signature comes from an
+    # OIDC token the job has to be allowed to request. Scoped to this job rather than the whole
+    # workflow: the NuGet job has no use for it.
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check the package exists
+        run: |
+          if [ ! -d clients/node ]; then
+            echo "::error::clients/node does not exist yet — see clients/README.md."
+            exit 1
+          fi
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: clients/node/package.json
+          registry-url: https://registry.npmjs.org
+          cache: pnpm
+          cache-dependency-path: clients/node/pnpm-lock.yaml
+
+      - name: Build and publish
+        working-directory: clients/node
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          VERSION="${GITHUB_REF_NAME#sdk-node-v}"
+          pnpm install --frozen-lockfile
+          pnpm build
+          pnpm version "$VERSION" --no-git-tag-version
+          # --provenance ties the published package to this workflow run, which is what lets
+          # somebody verify a package came from this repository rather than a stolen token.
+          pnpm publish --access public --no-git-checks --provenance

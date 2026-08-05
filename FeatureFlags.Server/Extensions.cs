@@ -108,19 +108,26 @@ public static class Extensions
 
     public static WebApplication MapDefaultEndpoints(this WebApplication app)
     {
-        // Adding health checks endpoints to applications in non-development environments has security implications.
-        // See https://aka.ms/aspire/healthchecks for details before enabling these endpoints in non-development environments.
-        if (app.Environment.IsDevelopment())
-        {
-            // All health checks must pass for app to be considered ready to accept traffic after starting
-            app.MapHealthChecks(HealthEndpointPath);
+        // Mapped in every environment, unlike the template's default. A self-hosted deployment has
+        // to be probeable — and leaving these to Development was worse than merely unhelpful here:
+        // an unmapped /health falls through to MapFallbackToFile and answers 200 with the console's
+        // HTML, so a container or Kubernetes probe passes falsely instead of failing.
+        //
+        // What https://aka.ms/aspire/healthchecks warns about is disclosure, and the default
+        // response writer discloses nothing: the body is the aggregate status word on its own, with
+        // no check names, durations, or exceptions. The set of checks is not a secret either — this
+        // application needs a database and a cache whether or not a probe says so.
 
-            // Only health checks tagged with the "live" tag must pass for app to be considered alive
-            app.MapHealthChecks(AlivenessEndpointPath, new HealthCheckOptions
-            {
-                Predicate = r => r.Tags.Contains("live")
-            });
-        }
+        // All health checks must pass for the app to be considered ready to accept traffic.
+        // Aspire's Npgsql and Redis client integrations register theirs here, so this answers
+        // healthy only once both are actually reachable.
+        app.MapHealthChecks(HealthEndpointPath);
+
+        // Only health checks tagged with the "live" tag must pass for app to be considered alive
+        app.MapHealthChecks(AlivenessEndpointPath, new HealthCheckOptions
+        {
+            Predicate = r => r.Tags.Contains("live")
+        });
 
         return app;
     }

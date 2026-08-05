@@ -1,0 +1,118 @@
+# FeatureFlags, self-hosted.
+#
+#   cp .env.example .env    # then fill in the three values it asks for
+#   docker compose up -d
+#
+# Five containers, of which the operator only ever addresses one: Caddy holds the certificate
+# and is the only thing bound to a host port. In particular `auth` must stay unpublished —
+# the browser reaches it through the server's /api/auth forwarder, and that indirection is
+# what keeps the session cookie first-party. Publishing it would not add a capability, it
+# would just create a second origin that breaks sign-in.
+
+name: featureflags
+
+services:
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    environment:
+      # Caddy reads the scheme too, so this one value decides both the hostname it requests a
+      # certificate for and whether it requests one at all. `http://` origins are served plain,
+      # which is what makes a local trial work without a public DNS name.
+      FEATUREFLAGS_ORIGIN: ${FEATUREFLAGS_ORIGIN:?set FEATUREFLAGS_ORIGIN in .env}
+    volumes:
+      # `z` relabels the file so a container can read it where SELinux is enforcing, which is
+      # the default on Fedora, RHEL, and their derivatives — without it Caddy starts, fails to
+      # read its config, and restarts forever. The flag is harmless everywhere else.
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro,z
+      - caddy-data:/data
+      - caddy-config:/config
+    depends_on:
+      server:
+        condition: service_started
+
+  server:
+    image: ghcr.io/chrisdusyk/featureflags-server:${FEATUREFLAGS_VERSION:-latest}
+    restart: unless-stopped
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      FEATUREFLAGS_ORIGIN: ${FEATUREFLAGS_ORIGIN}
+      FEATUREFLAGS_DATABASE_URL: ${FEATUREFLAGS_DATABASE_URL:-postgres://featureflags:${POSTGRES_PASSWORD}@postgres:5432/featureflagsdb}
+      FEATUREFLAGS_REDIS_URL: ${FEATUREFLAGS_REDIS_URL:-redis://redis:6379}
+      FEATUREFLAGS_AUTH_URL: http://auth:8080
+      # Sound here specifically because this file runs one replica. Scaling `server` past one
+      # means turning this off and running migrations as a step of their own.
+      FEATUREFLAGS_APPLY_MIGRATIONS: "true"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      # Not merely so the forwarder has a target. The server's migration puts a trigger on
+      # auth."user", and this service reports healthy only once that table exists — so this
+      # one line is what orders the two migrations correctly.
+      auth:
+        condition: service_healthy
+
+  auth:
+    image: ghcr.io/chrisdusyk/featureflags-auth:${FEATUREFLAGS_VERSION:-latest}
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET:?set BETTER_AUTH_SECRET in .env}
+      # Better Auth checks the origin a request claims to come from. That is the console's,
+      # never this service's, because every request arrives through the server's forwarder.
+      BETTER_AUTH_URL: ${FEATUREFLAGS_ORIGIN}
+      BETTER_AUTH_TRUSTED_ORIGINS: ${FEATUREFLAGS_ORIGIN}
+      FEATUREFLAGS_DATABASE_URL: ${FEATUREFLAGS_DATABASE_URL:-postgres://featureflags:${POSTGRES_PASSWORD}@postgres:5432/featureflagsdb}
+      FEATUREFLAGS_APPLY_MIGRATIONS: "true"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    # Declared here as well as in the image because some runtimes build OCI-format images, which
+    # have no HEALTHCHECK field — and the ordering above depends on this answering honestly.
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://127.0.0.1:8080/health"]
+      interval: 10s
+      timeout: 3s
+      retries: 12
+      start_period: 20s
+
+  # Comment this service out and set FEATUREFLAGS_DATABASE_URL to use a database you already
+  # run. Backups are not this file's job and it does not pretend otherwise — see
+  # docs/self-hosting.md.
+  postgres:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: featureflags
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+      POSTGRES_DB: featureflagsdb
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U featureflags -d featureflagsdb"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 10s
+
+  # Deliberately without a volume: everything here is a cache and can be lost with no
+  # consequence beyond a cold start.
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  postgres-data:
+  caddy-data:
+  caddy-config:

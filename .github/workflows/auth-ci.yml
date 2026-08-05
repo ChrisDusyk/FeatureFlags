@@ -1,0 +1,49 @@
+name: auth-ci
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "auth/**"
+      - ".github/workflows/auth-ci.yml"
+  push:
+    branches: [main]
+    paths:
+      - "auth/**"
+      - ".github/workflows/auth-ci.yml"
+
+concurrency:
+  group: auth-ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: auth
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: auth/package.json
+          cache: pnpm
+          cache-dependency-path: auth/pnpm-lock.yaml
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # There is no lint or test step here yet, so this is the only thing standing between a
+      # type error in the auth service and a release: `tsc -b` compiles to dist/, which is what
+      # the container actually runs. Node executes the TypeScript in src/ directly during
+      # development, so nothing else type-checks it.
+      - name: Build
+        run: pnpm build
