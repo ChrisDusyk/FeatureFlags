@@ -63,6 +63,11 @@ public static class SelfHostConfiguration
         "to be percent-encoded ('/' as %2F, '@' as %40). Generating the password with " +
         "`openssl rand -hex 24` avoids the problem; `-base64` does not, because base64 contains '/'.";
 
+    private const string DatabaseUrlNamesNoDatabase =
+        $"{DatabaseUrlVariable} names no database — there is nothing after the host. Write it as " +
+        "postgres://user:password@host:5432/featureflagsdb. Left out, the driver connects to a " +
+        "database named after the user instead, which is either missing or somebody else's.";
+
     private const string DatabaseUrlIsNotAUrl =
         $"{DatabaseUrlVariable} has to be a postgres:// or postgresql:// URL, e.g. " +
         "postgres://user:password@host:5432/featureflagsdb. The auth service reads this same " +
@@ -239,11 +244,22 @@ public static class SelfHostConfiguration
             throw new InvalidOperationException(UnparseableDatabaseUrl);
         }
 
+        // Npgsql treats an absent database as "the one named after the user", so an empty path
+        // here does not fail — it connects somewhere else. Either that database is missing, and
+        // the error names neither this variable nor the reason, or it exists and is somebody
+        // else's. Both services share this URL, so both would wander off to the same wrong place.
+        var database = Unescape(url.AbsolutePath.TrimStart('/'));
+
+        if (database.Length == 0)
+        {
+            throw new InvalidOperationException(DatabaseUrlNamesNoDatabase);
+        }
+
         var builder = new NpgsqlConnectionStringBuilder
         {
             Host = url.Host,
             Port = url.Port > 0 ? url.Port : DefaultPostgresPort,
-            Database = Unescape(url.AbsolutePath.TrimStart('/'))
+            Database = database
         };
 
         var (user, password) = SplitUserInfo(url.UserInfo);

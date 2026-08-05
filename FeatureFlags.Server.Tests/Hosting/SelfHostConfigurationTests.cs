@@ -145,6 +145,23 @@ public class SelfHostConfigurationTests
         Assert.Contains("postgres://", exception.Message);
     }
 
+    [Theory]
+    [InlineData("postgres://flags:s3cret@db.example.com:5432/")]
+    [InlineData("postgres://flags:s3cret@db.example.com:5432")]
+    [InlineData("postgres://flags:s3cret@db.example.com/?sslmode=require")]
+    public void ToNpgsqlConnectionString_RejectsAUrlThatNamesNoDatabase(string url)
+    {
+        // Not a parse failure — this one succeeds and produces `Database=`, which Npgsql reads as
+        // absent and fills with the user's name. The connection then goes somewhere real and
+        // wrong, or fails against a database nobody meant to name. Both services share this URL,
+        // so both would wander to the same place.
+        var exception = Assert.Throws<InvalidOperationException>(() =>
+            SelfHostConfiguration.ToNpgsqlConnectionString(url));
+
+        Assert.Contains(SelfHostConfiguration.DatabaseUrlVariable, exception.Message);
+        Assert.Contains("featureflagsdb", exception.Message);
+    }
+
     [Fact]
     public void ToNpgsqlConnectionString_KeepsNpgsqlSettingsReachableAsQueryParameters()
     {

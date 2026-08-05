@@ -111,12 +111,25 @@ function readDatabaseSettings(): DatabaseSettings {
       );
     }
 
+    // An empty path is not an error to the driver, which falls back to a database named after
+    // the user — so this would connect somewhere, just not here. The server refuses the same
+    // value for the same reason: one URL, one database, both services or neither.
+    const database = parsed.pathname.replace(/^\//, '');
+
+    if (!database) {
+      throw new Error(
+        `${name} names no database — there is nothing after the host. Write it as ` +
+          'postgres://user:password@host:5432/featureflagsdb. Left out, the driver connects to a ' +
+          "database named after the user instead, which is either missing or somebody else's.",
+      );
+    }
+
     return {
       host: parsed.hostname,
       port: parsed.port ? Number(parsed.port) : 5432,
       user: decodeURIComponent(parsed.username),
       password: decodeURIComponent(parsed.password),
-      database: parsed.pathname.replace(/^\//, ''),
+      database,
     };
   }
 
