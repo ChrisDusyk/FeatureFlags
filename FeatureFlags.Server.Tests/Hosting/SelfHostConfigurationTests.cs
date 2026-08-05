@@ -2,6 +2,7 @@ using FeatureFlags.Server.Hosting;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.FileProviders;
 using Microsoft.Extensions.Hosting;
+using Npgsql;
 
 namespace FeatureFlags.Server.Tests.Hosting;
 
@@ -94,6 +95,21 @@ public class SelfHostConfigurationTests
 
         Assert.Equal("ab/cd", settings["Password"]);
         Assert.Equal("db.example.com", settings["Host"]);
+    }
+
+    [Fact]
+    public void ToNpgsqlConnectionString_ReadsPlusAsAPlusRatherThanASpace()
+    {
+        // Form encoding writes a space as '+'; a URL does not, and this is a URL. Pinned because
+        // the Helm chart composes one of these from an operator-supplied password: emitting a
+        // space as '+' would hand Postgres a password nobody set, and it fails to authenticate
+        // with nothing anywhere naming the password as the cause. The chart writes %20.
+        // Npgsql quotes a value containing a space, so this reads it back through the builder
+        // rather than the naive splitter the other cases use.
+        var settings = new NpgsqlConnectionStringBuilder(SelfHostConfiguration.ToNpgsqlConnectionString(
+            "postgres://flags:ab%20cd+ef@db.example.com:5432/featureflagsdb"));
+
+        Assert.Equal("ab cd+ef", settings.Password);
     }
 
     [Theory]
