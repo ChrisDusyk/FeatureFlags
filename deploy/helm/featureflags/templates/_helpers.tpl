@@ -41,15 +41,27 @@ other rather than asking for both and letting them disagree.
 {{- end -}}
 
 {{/*
-`origin` with any trailing slash removed.
+`origin`, checked and with any trailing slash removed.
 
-An origin is a scheme, a host, and a port — never a trailing slash. A browser sends
-`https://flags.example.com`, so `https://flags.example.com/` in the trusted-origins list matches
-nothing and sign-in fails with an error that says only that the origin is invalid. Normalising
-here means a value that reads correctly to a person also behaves correctly.
+An origin is a scheme, a host, and a port — nothing else. A browser sends
+`https://flags.example.com`, so anything else here matches nothing in the trusted-origins list
+and sign-in fails with an error saying only that the origin is invalid — at a stranger's first
+attempt, long after `helm install` reported success.
+
+A trailing slash is a way of writing a correct value, so it is normalised. A path, a query, or a
+missing scheme is not: it means `origin` was read as "the console's URL" rather than the origin a
+browser sends, and no rendering of that value would work. Those fail here, where the value is set.
 */}}
 {{- define "featureflags.origin" -}}
-{{- required "origin is required, e.g. https://flags.example.com" .Values.origin | trimSuffix "/" -}}
+{{- $origin := required "origin is required, e.g. https://flags.example.com" .Values.origin | trimSuffix "/" -}}
+{{- if not (or (hasPrefix "https://" $origin) (hasPrefix "http://" $origin)) -}}
+{{- fail (printf "origin has to start with https:// or http:// — got %q. It is the origin a browser sends, not a hostname." $origin) -}}
+{{- end -}}
+{{- $rest := $origin | trimPrefix "https://" | trimPrefix "http://" -}}
+{{- if or (contains "/" $rest) (contains "?" $rest) (contains "#" $rest) -}}
+{{- fail (printf "origin has to be a scheme, a host, and an optional port, with nothing after it — got %q. A browser never sends a path in an Origin header, so this would fail at the first sign-in rather than here. Use the ingress or your proxy to serve the console under a path if you need one." $origin) -}}
+{{- end -}}
+{{- $origin -}}
 {{- end -}}
 
 {{- define "featureflags.serverImage" -}}
