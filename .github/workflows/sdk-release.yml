@@ -58,6 +58,12 @@ jobs:
   node:
     if: startsWith(github.ref_name, 'sdk-node-v')
     runs-on: ubuntu-latest
+    # --provenance signs the package against this workflow run, and the signature comes from an
+    # OIDC token the job has to be allowed to request. Scoped to this job rather than the whole
+    # workflow: the NuGet job has no use for it.
+    permissions:
+      contents: read
+      id-token: write
     steps:
       - uses: actions/checkout@v4
 

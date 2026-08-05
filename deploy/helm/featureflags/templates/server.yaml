@@ -60,7 +60,7 @@ spec:
             # Also tells the server it is behind a proxy, so it reads X-Forwarded-Proto rather
             # than believing every request arrived over plain HTTP.
             - name: FEATUREFLAGS_ORIGIN
-              value: {{ .Values.origin | quote }}
+              value: {{ include "featureflags.origin" . | quote }}
             - name: FEATUREFLAGS_AUTH_URL
               value: {{ include "featureflags.authAddress" . | quote }}
             - name: FEATUREFLAGS_REDIS_URL

@@ -28,9 +28,28 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 {{/*
 The host portion of `origin`. The ingress needs a bare hostname while the auth service needs the
 whole origin, so both come from the one value rather than being configured twice and drifting.
+
+Bare meaning no scheme, no port, and no path. An Ingress `host` is a DNS name and nothing else —
+`flags.example.com:8443` is rejected — while the origin the browser sends, and therefore the one
+Better Auth has to trust, does include the port. Those two differ, so this derives one from the
+other rather than asking for both and letting them disagree.
 */}}
 {{- define "featureflags.host" -}}
-{{- required "origin is required, e.g. https://flags.example.com" .Values.origin | trimPrefix "https://" | trimPrefix "http://" | trimSuffix "/" -}}
+{{- $authority := include "featureflags.origin" . | trimPrefix "https://" | trimPrefix "http://" -}}
+{{- $authority = (splitList "/" $authority) | first -}}
+{{- (splitList ":" $authority) | first -}}
+{{- end -}}
+
+{{/*
+`origin` with any trailing slash removed.
+
+An origin is a scheme, a host, and a port — never a trailing slash. A browser sends
+`https://flags.example.com`, so `https://flags.example.com/` in the trusted-origins list matches
+nothing and sign-in fails with an error that says only that the origin is invalid. Normalising
+here means a value that reads correctly to a person also behaves correctly.
+*/}}
+{{- define "featureflags.origin" -}}
+{{- required "origin is required, e.g. https://flags.example.com" .Values.origin | trimSuffix "/" -}}
 {{- end -}}
 
 {{- define "featureflags.serverImage" -}}

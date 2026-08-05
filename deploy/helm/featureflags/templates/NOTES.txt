@@ -1,6 +1,6 @@
 FeatureFlags {{ .Chart.AppVersion }} is installed as {{ .Release.Name }}.
 
-Console:  {{ .Values.origin }}
+Console:  {{ include "featureflags.origin" . }}
 
 {{- if not .Values.ingress.enabled }}
 

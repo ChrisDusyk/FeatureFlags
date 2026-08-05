@@ -4,6 +4,10 @@
 # trusts, and the URL Better Auth builds links against — and those have to agree. A mismatch does
 # not fail at startup; it fails at somebody's first sign-in, with an error that does not name the
 # cause. Include the port if it is not the scheme's default.
+#
+# The ingress host is derived from this by dropping the scheme, the port, and any path, because an
+# Ingress host is a DNS name and nothing else. The auth service still receives the whole origin,
+# port included, since that is what a browser actually sends.
 origin: https://flags.example.com
 
 image:

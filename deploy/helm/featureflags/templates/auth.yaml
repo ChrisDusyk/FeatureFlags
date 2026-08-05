@@ -40,9 +40,9 @@ spec:
             # The origin a browser sees is the console's, never this service's — every request
             # arrives through the server's /api/auth forwarder.
             - name: BETTER_AUTH_URL
-              value: {{ .Values.origin | quote }}
+              value: {{ include "featureflags.origin" . | quote }}
             - name: BETTER_AUTH_TRUSTED_ORIGINS
-              value: {{ .Values.origin | quote }}
+              value: {{ include "featureflags.origin" . | quote }}
             - name: FEATUREFLAGS_APPLY_MIGRATIONS
               value: {{ eq .Values.migrations.mode "auto" | quote }}
             {{- include "featureflags.databaseUrlEnv" . | nindent 12 }}
