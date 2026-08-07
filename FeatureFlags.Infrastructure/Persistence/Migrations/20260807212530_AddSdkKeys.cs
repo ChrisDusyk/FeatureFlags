@@ -18,7 +18,7 @@ namespace FeatureFlags.Infrastructure.Persistence.Migrations
                     Id = table.Column<Guid>(type: "uuid", nullable: false),
                     Name = table.Column<string>(type: "character varying(100)", maxLength: 100, nullable: false),
                     Environment = table.Column<string>(type: "character varying(20)", maxLength: 20, nullable: false),
-                    Selector = table.Column<string>(type: "character varying(11)", maxLength: 11, nullable: false),
+                    Selector = table.Column<string>(type: "character varying(16)", maxLength: 16, nullable: false),
                     SecretHash = table.Column<byte[]>(type: "bytea", nullable: false),
                     CreatedBy = table.Column<Guid>(type: "uuid", nullable: false),
                     CreatedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),

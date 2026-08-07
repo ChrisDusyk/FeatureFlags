@@ -12,7 +12,7 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace FeatureFlags.Infrastructure.Persistence.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    [Migration("20260807211620_AddSdkKeys")]
+    [Migration("20260807212530_AddSdkKeys")]
     partial class AddSdkKeys
     {
         /// <inheritdoc />
@@ -87,8 +87,8 @@ namespace FeatureFlags.Infrastructure.Persistence.Migrations
 
                     b.Property<string>("Selector")
                         .IsRequired()
-                        .HasMaxLength(11)
-                        .HasColumnType("character varying(11)");
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)");
 
                     b.Property<DateTimeOffset?>("_lastUsedAt")
                         .HasColumnType("timestamp with time zone")

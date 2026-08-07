@@ -84,8 +84,8 @@ namespace FeatureFlags.Infrastructure.Persistence.Migrations
 
                     b.Property<string>("Selector")
                         .IsRequired()
-                        .HasMaxLength(11)
-                        .HasColumnType("character varying(11)");
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)");
 
                     b.Property<DateTimeOffset?>("_lastUsedAt")
                         .HasColumnType("timestamp with time zone")

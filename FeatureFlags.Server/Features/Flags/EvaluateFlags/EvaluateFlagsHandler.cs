@@ -73,7 +73,10 @@ public sealed class EvaluateFlagsHandler(IFeatureFlagRepository repository, Hybr
             .OrderBy(state => state.Key, StringComparer.Ordinal)
             .ToList();
 
-        var fingerprint = new StringBuilder();
+        // The environment leads the fingerprint because it is in the body: two environments that
+        // happen to agree on every flag are still two different responses, and one ETag standing
+        // for both would let a client be told nothing had changed when everything had.
+        var fingerprint = new StringBuilder(environment.Value).Append('\n');
         var evaluated = new Dictionary<string, bool>(states.Count, StringComparer.Ordinal);
 
         foreach (var (key, isEnabled) in states)

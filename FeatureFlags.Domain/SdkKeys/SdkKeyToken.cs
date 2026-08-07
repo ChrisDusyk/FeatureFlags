@@ -1,4 +1,3 @@
-using System.Buffers.Text;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.RegularExpressions;
@@ -10,7 +9,7 @@ namespace FeatureFlags.Domain.SdkKeys;
 /// <summary>
 /// The credential a program holds, and the only place its format is decided.
 ///
-/// <code>ffs_dev_Ab3xK9mQr7T_8fJ2…43 characters…kLp</code>
+/// <code>ffs_dev_9f2a71c0d4e83b16_4c1e…64 hex characters…9ab7</code>
 ///
 /// <para>
 /// Four segments. The <c>ffs_</c> prefix is what lets the server tell an SDK key from a JWT before
@@ -33,11 +32,11 @@ public sealed partial class SdkKeyToken
     private const int SelectorBytes = 8;
     private const int SecretBytes = 32;
 
-    /// <summary>Unpadded base64url of <see cref="SelectorBytes"/> bytes.</summary>
-    public const int SelectorLength = 11;
+    /// <summary>Lowercase hex of <see cref="SelectorBytes"/> bytes.</summary>
+    public const int SelectorLength = SelectorBytes * 2;
 
-    /// <summary>Unpadded base64url of <see cref="SecretBytes"/> bytes.</summary>
-    public const int SecretLength = 43;
+    /// <summary>Lowercase hex of <see cref="SecretBytes"/> bytes.</summary>
+    public const int SecretLength = SecretBytes * 2;
 
     private SdkKeyToken(string value, string selector, byte[] secretHash)
     {
@@ -66,8 +65,12 @@ public sealed partial class SdkKeyToken
     /// </summary>
     public static SdkKeyToken Issue(EnvironmentKey environment)
     {
-        var selector = Base64Url.EncodeToString(RandomNumberGenerator.GetBytes(SelectorBytes));
-        var secret = Base64Url.EncodeToString(RandomNumberGenerator.GetBytes(SecretBytes));
+        // Hex, not base64url, and that is not an aesthetic choice: base64url's alphabet includes
+        // the underscore this format separates its segments with, so roughly one token in ten would
+        // have split into the wrong number of pieces. Hex has no character in common with the
+        // separator, which makes the format unambiguous rather than usually-unambiguous.
+        var selector = Convert.ToHexStringLower(RandomNumberGenerator.GetBytes(SelectorBytes));
+        var secret = Convert.ToHexStringLower(RandomNumberGenerator.GetBytes(SecretBytes));
 
         return new SdkKeyToken(
             $"{Prefix}_{environment.Value}_{selector}_{secret}",
@@ -118,7 +121,7 @@ public sealed partial class SdkKeyToken
     /// each other.
     /// </para>
     /// </summary>
-    [GeneratedRegex(@"^ffs_[a-z0-9-]+_[A-Za-z0-9_-]{11}_[A-Za-z0-9_-]{43}$")]
+    [GeneratedRegex(@"^ffs_[a-z0-9-]+_[a-f0-9]{16}_[a-f0-9]{64}$")]
     private static partial Regex TokenPattern();
 }
 
