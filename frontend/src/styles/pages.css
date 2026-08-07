@@ -524,3 +524,175 @@
     align-self: flex-end;
   }
 }
+
+/* ------------------------------------------------------------- sdk keys --- */
+
+.envkeys {
+  margin-top: 2.5rem;
+  padding: 1.5rem 1.75rem;
+  border: 1px solid var(--rule);
+  border-left: 4px solid var(--tone);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+
+.envkeys__head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1.5rem;
+}
+
+.envkeys__name {
+  display: flex;
+  align-items: baseline;
+  gap: 0.75rem;
+  font-family: var(--font-display);
+  font-stretch: 114%;
+  font-weight: 640;
+  font-size: 1.375rem;
+  letter-spacing: -0.01em;
+  color: var(--graphite);
+}
+
+.envkeys__blurb {
+  max-width: 52ch;
+  margin-top: 0.375rem;
+  font-size: 0.9375rem;
+  color: var(--graphite-dim);
+}
+
+.envkeys__empty {
+  margin-top: 1.25rem;
+  padding-top: 1.25rem;
+  border-top: 1px solid var(--rule);
+  font-size: 0.9375rem;
+  color: var(--graphite-dim);
+}
+
+.envkeys__count {
+  margin-top: 0.875rem;
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  letter-spacing: 0.02em;
+  color: var(--graphite-dim);
+}
+
+.keylist {
+  margin-top: 1.25rem;
+  border-top: 1px solid var(--rule);
+}
+
+.keyrow {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1.5rem;
+  padding: 1rem 0;
+  border-bottom: 1px solid var(--rule);
+}
+
+/* Withdrawn, not broken: a revoked key recedes rather than alarms. */
+.keyrow--revoked {
+  color: var(--graphite-dim);
+}
+
+.keyrow--revoked .keyrow__name,
+.keyrow--revoked .keyrow__hint {
+  color: var(--graphite-dim);
+  text-decoration: line-through;
+  text-decoration-thickness: 1px;
+}
+
+.keyrow__body {
+  min-width: 0;
+}
+
+.keyrow__name {
+  font-weight: 600;
+  font-size: 0.9375rem;
+  color: var(--graphite);
+}
+
+.keyrow__hint {
+  display: inline-block;
+  margin-top: 0.3125rem;
+  padding: 0.125rem 0.4375rem;
+  border-radius: 0.25rem;
+  background: var(--paper);
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  color: var(--graphite);
+  overflow-wrap: anywhere;
+}
+
+.keyrow__meta {
+  margin-top: 0.375rem;
+  font-size: 0.8125rem;
+  color: var(--graphite-dim);
+}
+
+.keyrow__error {
+  margin-top: 0.5rem;
+  font-size: 0.8125rem;
+  color: var(--halt);
+}
+
+.keyrow__confirm {
+  flex-shrink: 0;
+  max-width: 22rem;
+  text-align: right;
+}
+
+.keyrow__confirmtext {
+  font-size: 0.8125rem;
+  color: var(--halt);
+}
+
+.keyrow__confirmactions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  margin-top: 0.625rem;
+}
+
+/*
+  The token, shown once. Wide, monospaced, and selectable by hand, because the clipboard is not
+  always available and this is the only chance anyone gets at this string.
+*/
+.tokenbox {
+  display: block;
+  padding: 0.875rem 1rem;
+  border: 1px solid var(--rule-strong);
+  border-radius: var(--radius);
+  background: var(--paper);
+}
+
+.tokenbox__value {
+  font-family: var(--font-mono);
+  font-size: 0.8125rem;
+  line-height: 1.6;
+  color: var(--graphite);
+  overflow-wrap: anywhere;
+  user-select: all;
+}
+
+@media (max-width: 40rem) {
+  .envkeys__head {
+    flex-direction: column;
+  }
+
+  .keyrow {
+    flex-direction: column;
+    gap: 0.875rem;
+  }
+
+  .keyrow__confirm {
+    max-width: none;
+    text-align: left;
+  }
+
+  .keyrow__confirmactions {
+    justify-content: flex-start;
+  }
+}
