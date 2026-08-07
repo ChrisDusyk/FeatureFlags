@@ -132,6 +132,46 @@ public class FeatureFlagClientTests
         Assert.True(await client.IsEnabledAsync("on", Cancellation));
     }
 
+    /// <summary>
+    /// A server that accepts the connection and then never answers is the failure mode a bare
+    /// "unreachable" test misses: the timeout surfaces as an OperationCanceledException, the same
+    /// type a caller's own cancellation uses, and the two have to be told apart.
+    /// </summary>
+    [Fact]
+    public async Task IsEnabledAsync_WhenTheServerHangs_ShouldReturnTheDefaultRatherThanThrow()
+    {
+        _options.Timeout = TimeSpan.FromMilliseconds(50);
+        _server.Delay = TimeSpan.FromSeconds(30);
+        _server.AnswersWithFlags("dev", new { on = true }, "\"v1\"");
+
+        Assert.False(await CreateSut().IsEnabledAsync("on", Cancellation));
+    }
+
+    [Fact]
+    public async Task IsEnabledAsync_WhenTheCallerCancels_ShouldNotSwallowIt()
+    {
+        _server.Delay = TimeSpan.FromSeconds(30);
+        _server.AnswersWithFlags("dev", new { on = true }, "\"v1\"");
+
+        using var caller = new CancellationTokenSource(TimeSpan.FromMilliseconds(50));
+
+        // The caller's own instruction, not a failure to absorb — swallowing it would leave them
+        // waiting on a token they already cancelled.
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(
+            () => CreateSut().IsEnabledAsync("on", caller.Token));
+    }
+
+    [Fact]
+    public async Task RefreshAsync_WhenTheServerHangs_ShouldReportIt()
+    {
+        _options.Timeout = TimeSpan.FromMilliseconds(50);
+        _server.Delay = TimeSpan.FromSeconds(30);
+        _server.AnswersWithFlags("dev", new { on = true }, "\"v1\"");
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(
+            () => CreateSut().RefreshAsync(Cancellation));
+    }
+
     [Fact]
     public async Task RefreshAsync_ShouldReportAFailureRatherThanSwallowIt()
     {

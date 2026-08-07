@@ -17,6 +17,10 @@ internal sealed class StubHandler : HttpMessageHandler
 
     public int CallCount => Requests.Count;
 
+    /// <summary>How long the stub takes to answer. Stands in for a server that accepts the
+    /// connection and then does not respond.</summary>
+    public TimeSpan Delay { get; set; } = TimeSpan.Zero;
+
     /// <summary>The last answer queued repeats once the queue runs dry, so a polling test does not
     /// have to enumerate every poll it might make.</summary>
     private Func<HttpRequestMessage, HttpResponseMessage>? _last;
@@ -58,11 +62,16 @@ internal sealed class StubHandler : HttpMessageHandler
 
     public StubHandler Throws() => Answers(_ => throw new HttpRequestException("The stub refused."));
 
-    protected override Task<HttpResponseMessage> SendAsync(
+    protected override async Task<HttpResponseMessage> SendAsync(
         HttpRequestMessage request,
         CancellationToken cancellationToken)
     {
         Requests.Add(request);
+
+        if (Delay > TimeSpan.Zero)
+        {
+            await Task.Delay(Delay, cancellationToken);
+        }
 
         if (_answers.Count > 0)
         {
@@ -71,6 +80,6 @@ internal sealed class StubHandler : HttpMessageHandler
 
         var answer = _last ?? throw new InvalidOperationException("The stub was asked before it was told what to say.");
 
-        return Task.FromResult(answer(request));
+        return answer(request);
     }
 }

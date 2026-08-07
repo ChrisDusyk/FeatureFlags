@@ -19,7 +19,7 @@ namespace FeatureFlags.Client.Internal;
 /// </summary>
 internal sealed class FeatureFlagsRefreshService : BackgroundService
 {
-    private readonly FeatureFlagClient _client;
+    private readonly IFeatureFlagClient _client;
     private readonly FeatureFlagsOptions _options;
     private readonly ILogger<FeatureFlagsRefreshService> _logger;
 
@@ -28,9 +28,11 @@ internal sealed class FeatureFlagsRefreshService : BackgroundService
         IOptions<FeatureFlagsOptions> options,
         ILogger<FeatureFlagsRefreshService> logger)
     {
-        // The concrete type, because the polling loop needs the non-throwing refresh that is not
-        // part of the interface a caller sees.
-        _client = (FeatureFlagClient)client;
+        // The interface, and only the interface. A consumer is allowed to register their own
+        // implementation — a stub in a test, a decorator that records what was asked — and this
+        // used to cast to the concrete client, which turned that into an InvalidCastException
+        // while the host was starting. Whatever is registered is what gets refreshed.
+        _client = client;
         _options = options.Value;
         _logger = logger;
     }
@@ -41,7 +43,7 @@ internal sealed class FeatureFlagsRefreshService : BackgroundService
     /// </summary>
     public override async Task StartAsync(CancellationToken cancellationToken)
     {
-        await _client.RefreshAsync(_options.ThrowOnStartupFailure, cancellationToken).ConfigureAwait(false);
+        await RefreshAsync(rethrow: _options.ThrowOnStartupFailure, cancellationToken).ConfigureAwait(false);
 
         await base.StartAsync(cancellationToken).ConfigureAwait(false);
     }
@@ -60,9 +62,31 @@ internal sealed class FeatureFlagsRefreshService : BackgroundService
                 return;
             }
 
-            // Never throws: a polling loop that dies on one bad response would leave the snapshot
-            // frozen at whatever it last held, silently, for the life of the process.
-            await _client.RefreshAsync(throwOnFailure: false, stoppingToken).ConfigureAwait(false);
+            await RefreshAsync(rethrow: false, stoppingToken).ConfigureAwait(false);
+        }
+    }
+
+    /// <summary>
+    /// <see cref="IFeatureFlagClient.RefreshAsync"/> reports a failure, which is right for somebody
+    /// who asked for one explicitly and wrong for a loop: a polling loop that died on one bad
+    /// response would leave the snapshot frozen at whatever it last held, silently, for the life of
+    /// the process. So the loop catches, and only startup rethrows — and only when asked to.
+    /// </summary>
+    private async Task RefreshAsync(bool rethrow, CancellationToken cancellationToken)
+    {
+        try
+        {
+            await _client.RefreshAsync(cancellationToken).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException)
+        {
+            // Shutting down mid-fetch. Not a failure, and not something to log about.
+        }
+        catch (Exception exception) when (!rethrow)
+        {
+            _logger.LogWarning(
+                exception,
+                "Could not refresh feature flags. Callers continue with the flags last read.");
         }
     }
 

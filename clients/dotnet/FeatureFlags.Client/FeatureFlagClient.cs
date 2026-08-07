@@ -121,7 +121,17 @@ internal sealed class FeatureFlagClient : IFeatureFlagClient, IDisposable
             // an unchanged snapshot would look stale forever and be refetched on every read.
             _snapshot = fetched ?? current?.RefreshedAt(_timeProvider.GetUtcNow());
         }
-        catch (Exception exception) when (!throwOnFailure && exception is not OperationCanceledException)
+        // The caller asked to stop. That is not a failure to absorb — it is the caller's own
+        // instruction, and swallowing it would leave them waiting on a token they already cancelled.
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        // Everything else, including a timeout. A timeout arrives as an OperationCanceledException
+        // too, from the linked source above rather than from the caller — telling the two apart is
+        // the whole point of the filter, because a server that accepts a connection and then never
+        // answers must fall back like any other unreachable one rather than throw at a reader.
+        catch (Exception exception) when (!throwOnFailure)
         {
             _logger.LogWarning(
                 exception,
