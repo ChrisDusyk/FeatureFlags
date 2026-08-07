@@ -19,6 +19,10 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "FeatureFlags.Server.Tests",
 EndProject
 Project("{54A90642-561A-4BB1-A94E-469ADEE60C69}") = "auth", "auth\auth.esproj", "{79808741-B37B-47B4-BBB7-896FFA4C32AF}"
 EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "clients", "clients", "{9123F88B-E531-3118-42D7-ED8CEF4BD00E}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "dotnet", "dotnet", "{85F27C6A-2B5B-DBF6-E11C-F59BFA06573F}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -118,6 +122,9 @@ Global
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(NestedProjects) = preSolution
+		{85F27C6A-2B5B-DBF6-E11C-F59BFA06573F} = {9123F88B-E531-3118-42D7-ED8CEF4BD00E}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {647C02FE-2DE6-4815-A6F4-6721E4875424}
