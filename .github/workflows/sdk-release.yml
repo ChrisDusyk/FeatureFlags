@@ -9,9 +9,8 @@ name: sdk-release
 # on a different clock than the platform — lockstep would mean a no-op package release on every
 # platform bump.
 #
-# Neither package exists yet. See clients/README.md: there is no machine credential and no
-# evaluation endpoint, so there is nothing yet for a client library to call. The jobs below fail
-# loudly rather than silently publishing nothing if a tag is pushed before that lands.
+# The .NET package exists. The node one does not yet, and its job fails loudly rather than
+# silently publishing nothing if a tag is pushed before it lands.
 
 on:
   push:
@@ -29,21 +28,16 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Check the package exists
-        run: |
-          if [ ! -d clients/dotnet ]; then
-            echo "::error::clients/dotnet does not exist yet — see clients/README.md."
-            exit 1
-          fi
-
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: "10.0.x"
 
+      # The project, not the directory: clients/dotnet also holds the test project, and packing a
+      # directory containing two projects fails. Only visible at release time, so it is spelled out.
       - name: Pack
         run: |
           VERSION="${GITHUB_REF_NAME#sdk-dotnet-v}"
-          dotnet pack clients/dotnet --configuration Release \
+          dotnet pack clients/dotnet/FeatureFlags.Client --configuration Release \
             -p:MinVerVersionOverride="$VERSION" --output dist
 
       - name: Push
