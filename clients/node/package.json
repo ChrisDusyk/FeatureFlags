@@ -1,0 +1,46 @@
+{
+  "name": "@featureflags/client",
+  "version": "0.0.0",
+  "description": "Client for a self-hosted FeatureFlags installation. Runs on a server or in a browser, reading flag states for the environment its SDK key is scoped to.",
+  "license": "MIT",
+  "type": "module",
+  "engines": {
+    "node": "^20.19.0 || >=22.12.0"
+  },
+  "packageManager": "pnpm@10.33.2",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ChrisDusyk/FeatureFlags.git",
+    "directory": "clients/node"
+  },
+  "homepage": "https://github.com/ChrisDusyk/FeatureFlags/tree/main/clients/node",
+  "keywords": [
+    "feature-flags",
+    "feature-toggles",
+    "featureflags"
+  ],
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "sideEffects": false,
+  "scripts": {
+    "build": "tsc -b",
+    "test": "vitest run",
+    "lint": "eslint ."
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.39.1",
+    "@types/node": "^24.10.1",
+    "eslint": "^9.39.1",
+    "typescript": "~5.9.3",
+    "typescript-eslint": "^8.48.1",
+    "vitest": "^3.2.4"
+  }
+}
