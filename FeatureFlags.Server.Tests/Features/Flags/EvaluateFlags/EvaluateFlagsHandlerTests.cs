@@ -1,0 +1,159 @@
+using FeatureFlags.Domain.Environments;
+using FeatureFlags.Domain.Flags;
+using FeatureFlags.Server.Features.Flags.EvaluateFlags;
+using FeatureFlags.Server.Tests.Fakes;
+using Microsoft.Extensions.Caching.Hybrid;
+using Microsoft.Extensions.DependencyInjection;
+
+namespace FeatureFlags.Server.Tests.Features.Flags.EvaluateFlags;
+
+public class EvaluateFlagsHandlerTests
+{
+    private static readonly DateTimeOffset Now = new(2026, 8, 7, 12, 0, 0, TimeSpan.Zero);
+
+    private readonly FakeFeatureFlagRepository _repository = new();
+
+    /// <summary>
+    /// A fresh cache per handler, so a test that wants to see a change reaches for a new one rather
+    /// than waiting out an expiry. With no <c>IDistributedCache</c> registered, HybridCache runs on
+    /// its in-process tier alone — which is the same code path the second tier sits behind.
+    /// </summary>
+    private EvaluateFlagsHandler CreateSut() => new(
+        _repository,
+        new ServiceCollection().AddHybridCache().Services
+            .BuildServiceProvider()
+            .GetRequiredService<HybridCache>());
+
+    private void Seed(string key, params EnvironmentKey[] enabledIn) =>
+        _repository.Seed(FeatureFlag.Create(key, key, null, enabledIn, Now).Value);
+
+    private async Task<EvaluatedFlags> EvaluateAsync(EnvironmentKey environment) =>
+        (await CreateSut().HandleAsync(
+            new EvaluateFlagsQuery(environment),
+            TestContext.Current.CancellationToken)).Value;
+
+    [Fact]
+    public async Task HandleAsync_WithNoFlags_ShouldAnswerWithAnEmptyMap()
+    {
+        var evaluated = await EvaluateAsync(EnvironmentKey.Development);
+
+        Assert.Equal("dev", evaluated.Response.Environment);
+        Assert.Empty(evaluated.Response.Flags);
+    }
+
+    [Fact]
+    public async Task HandleAsync_ShouldAnswerForTheEnvironmentAsked()
+    {
+        Seed("new-checkout", EnvironmentKey.Development);
+        Seed("dark-mode", EnvironmentKey.Production);
+
+        var development = await EvaluateAsync(EnvironmentKey.Development);
+        var production = await EvaluateAsync(EnvironmentKey.Production);
+
+        Assert.True(development.Response.Flags["new-checkout"]);
+        Assert.False(development.Response.Flags["dark-mode"]);
+
+        Assert.False(production.Response.Flags["new-checkout"]);
+        Assert.True(production.Response.Flags["dark-mode"]);
+    }
+
+    [Fact]
+    public async Task HandleAsync_ShouldIncludeEveryFlagRegardlessOfState()
+    {
+        Seed("on", EnvironmentKey.Development);
+        Seed("off");
+
+        var evaluated = await EvaluateAsync(EnvironmentKey.Development);
+
+        // A flag missing from the map and a flag that is off are different answers to a client
+        // holding a default, so an off flag has to be present and false rather than absent.
+        Assert.Equal(2, evaluated.Response.Flags.Count);
+        Assert.False(evaluated.Response.Flags["off"]);
+    }
+
+    [Fact]
+    public async Task HandleAsync_ShouldQuoteTheETag()
+    {
+        Seed("new-checkout", EnvironmentKey.Development);
+
+        var evaluated = await EvaluateAsync(EnvironmentKey.Development);
+
+        // A bare tag is silently ignored by anything that parses the header properly.
+        Assert.StartsWith("\"", evaluated.ETag);
+        Assert.EndsWith("\"", evaluated.ETag);
+    }
+
+    [Fact]
+    public async Task HandleAsync_WithUnchangedFlags_ShouldReturnTheSameETag()
+    {
+        Seed("new-checkout", EnvironmentKey.Development);
+
+        var first = await EvaluateAsync(EnvironmentKey.Development);
+        var second = await EvaluateAsync(EnvironmentKey.Development);
+
+        Assert.Equal(first.ETag, second.ETag);
+    }
+
+    [Fact]
+    public async Task HandleAsync_AfterAFlagIsToggled_ShouldReturnADifferentETag()
+    {
+        Seed("new-checkout", EnvironmentKey.Development);
+
+        var before = await EvaluateAsync(EnvironmentKey.Development);
+
+        _repository.Committed.Single().SetEnabled(EnvironmentKey.Development, false, Now.AddHours(1));
+
+        var after = await EvaluateAsync(EnvironmentKey.Development);
+
+        Assert.NotEqual(before.ETag, after.ETag);
+        Assert.False(after.Response.Flags["new-checkout"]);
+    }
+
+    [Fact]
+    public async Task HandleAsync_AfterAFlagIsAdded_ShouldReturnADifferentETag()
+    {
+        Seed("new-checkout", EnvironmentKey.Development);
+
+        var before = await EvaluateAsync(EnvironmentKey.Development);
+
+        Seed("dark-mode", EnvironmentKey.Development);
+
+        Assert.NotEqual(before.ETag, (await EvaluateAsync(EnvironmentKey.Development)).ETag);
+    }
+
+    /// <summary>
+    /// Two environments that happen to agree on every flag are still two different answers, and a
+    /// client caching by ETag alone would otherwise be told nothing had changed when it switched.
+    /// </summary>
+    [Fact]
+    public async Task HandleAsync_ForDifferentEnvironments_ShouldNotShareAnETag()
+    {
+        Seed("new-checkout");
+
+        var development = await EvaluateAsync(EnvironmentKey.Development);
+        var production = await EvaluateAsync(EnvironmentKey.Production);
+
+        Assert.Equal(development.Response.Flags, production.Response.Flags);
+        Assert.NotEqual(development.ETag, production.ETag);
+    }
+
+    [Fact]
+    public async Task HandleAsync_ShouldServeARepeatedCallFromTheCache()
+    {
+        Seed("new-checkout", EnvironmentKey.Development);
+
+        var handler = CreateSut();
+        var query = new EvaluateFlagsQuery(EnvironmentKey.Development);
+
+        var first = await handler.HandleAsync(query, TestContext.Current.CancellationToken);
+
+        // Changing the flags behind the handler's back: the cached answer is the one that proves
+        // the second call did not reach the repository.
+        _repository.Committed.Single().SetEnabled(EnvironmentKey.Development, false, Now.AddHours(1));
+
+        var second = await handler.HandleAsync(query, TestContext.Current.CancellationToken);
+
+        Assert.Equal(first.Value.ETag, second.Value.ETag);
+        Assert.True(second.Value.Response.Flags["new-checkout"]);
+    }
+}

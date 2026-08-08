@@ -22,6 +22,7 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="Aspire.StackExchange.Redis.DistributedCaching" Version="13.4.6" />
     <PackageReference Include="Aspire.StackExchange.Redis.OutputCaching" Version="13.4.6" />
     <PackageReference Include="Microsoft.Extensions.ApiDescription.Server" Version="10.0.10">
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
@@ -29,6 +30,7 @@
     </PackageReference>
     <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="10.0.10" />
     <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.8" />
+    <PackageReference Include="Microsoft.Extensions.Caching.Hybrid" Version="10.8.0" />
     <!--
       Direct only to lift the transitive Microsoft.OpenApi off 2.0.0, which has a high-severity
       advisory (GHSA-v5pm-xwqc-g5wc: a circular schema reference can terminate parsing), patched

@@ -57,6 +57,53 @@ namespace FeatureFlags.Infrastructure.Persistence.Migrations
                     b.ToTable("feature_flags", (string)null);
                 });
 
+            modelBuilder.Entity("FeatureFlags.Domain.SdkKeys.SdkKey", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("CreatedBy")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Environment")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<byte[]>("SecretHash")
+                        .IsRequired()
+                        .HasColumnType("bytea");
+
+                    b.Property<string>("Selector")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)");
+
+                    b.Property<DateTimeOffset?>("_lastUsedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("LastUsedAt");
+
+                    b.Property<DateTimeOffset?>("_revokedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("RevokedAt");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Selector")
+                        .IsUnique()
+                        .HasDatabaseName("IX_sdk_keys_Selector");
+
+                    b.ToTable("sdk_keys", (string)null);
+                });
+
             modelBuilder.Entity("FeatureFlags.Domain.Users.User", b =>
                 {
                     b.Property<Guid>("Id")

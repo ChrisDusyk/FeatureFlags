@@ -1,5 +1,6 @@
+using FeatureFlags.Domain.SdkKeys;
 using FeatureFlags.Domain.Users;
-using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Authentication;
 using Microsoft.IdentityModel.Protocols;
 using Microsoft.IdentityModel.Protocols.OpenIdConnect;
 using Microsoft.IdentityModel.Tokens;
@@ -28,8 +29,17 @@ public static class AuthenticationExtensions
     {
         var authAddress = builder.Configuration.GetAuthServiceAddress();
 
-        builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
-            .AddJwtBearer(options =>
+        builder.Services.AddAuthentication(AuthSchemes.Any)
+            // The scheme every endpoint actually runs: it reads the credential and forwards to one
+            // of the two below. See AuthSchemes.Any for why this is a shape test and not a retry.
+            .AddPolicyScheme(AuthSchemes.Any, displayName: null, options =>
+                options.ForwardDefaultSelector = context =>
+                    SdkKeyToken.LooksLikeSdkKey(ReadBearerToken(context))
+                        ? AuthSchemes.SdkKey
+                        : AuthSchemes.Jwt)
+            .AddScheme<AuthenticationSchemeOptions, SdkKeyAuthenticationHandler>(
+                AuthSchemes.SdkKey, displayName: null, configureOptions: null)
+            .AddJwtBearer(AuthSchemes.Jwt, options =>
             {
                 // Keep the claim names the token actually uses. Without this ASP.NET rewrites
                 // "sub" and "role" into WS-Federation URIs, and AuthClaims stops lining up.
@@ -59,13 +69,37 @@ public static class AuthenticationExtensions
                     new HttpDocumentRetriever { RequireHttps = false });
             });
 
+        // Every policy names the scheme it accepts, and that is load-bearing rather than tidy.
+        // RequireAuthenticatedUser() is satisfied by *any* authenticated principal, so without
+        // AddAuthenticationSchemes an SDK key would pass SignedIn and be handed the whole console
+        // API. Pinning them here closes that for every existing slice at once, and for every slice
+        // written afterwards — a new endpoint gets it by asking for a policy, which it must anyway.
         builder.Services.AddAuthorizationBuilder()
-            .AddPolicy(AuthPolicies.SignedIn, policy => policy.RequireAuthenticatedUser())
+            .AddPolicy(AuthPolicies.SignedIn, policy => policy
+                .AddAuthenticationSchemes(AuthSchemes.Jwt)
+                .RequireAuthenticatedUser())
             .AddPolicy(AuthPolicies.Admin, policy => policy
+                .AddAuthenticationSchemes(AuthSchemes.Jwt)
                 .RequireAuthenticatedUser()
-                .RequireRole(UserRole.Admin.Value));
+                .RequireRole(UserRole.Admin.Value))
+            .AddPolicy(AuthPolicies.SdkKey, policy => policy
+                .AddAuthenticationSchemes(AuthSchemes.SdkKey)
+                .RequireAuthenticatedUser());
 
         return builder;
+    }
+
+    /// <summary>
+    /// The bearer token as presented, or null. Only enough parsing to tell the two credential kinds
+    /// apart — whichever handler it forwards to does the real work.
+    /// </summary>
+    private static string? ReadBearerToken(HttpContext context)
+    {
+        var header = context.Request.Headers.Authorization.ToString();
+
+        return header.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase)
+            ? header["Bearer ".Length..].Trim()
+            : null;
     }
 
     /// <summary>

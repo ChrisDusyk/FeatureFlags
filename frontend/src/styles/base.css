@@ -199,6 +199,20 @@ textarea.field__input {
   color: var(--graphite-dim);
 }
 
+/*
+  Destructive, and only ever behind a confirmation. Halt, not heat: --live means a thing is on,
+  and a revoke button is not a flag in production.
+*/
+.button--danger {
+  background: var(--halt);
+  color: #ffffff;
+}
+
+.button--danger:hover:not(:disabled) {
+  background: #8f2415;
+  color: #ffffff;
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,

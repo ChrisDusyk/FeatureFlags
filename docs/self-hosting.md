@@ -78,8 +78,10 @@ Anything Npgsql accepts is reachable as a query parameter, so nothing is out of 
 ## Architecture, and one rule
 
 ```
-browser ──▶ Caddy / ingress ──▶ server ──▶ /api/auth/* ──▶ auth service ──▶ auth schema
-                                       └─▶ /api/*      ──▶ (JWT bearer)  ──▶ public schema
+browser ──▶ Caddy / ingress ──▶ server ──▶ /api/auth/*   ──▶ auth service ──▶ auth schema
+                                       └─▶ /api/*        ──▶ (JWT bearer)  ──▶ public schema
+
+your app ─▶ Caddy / ingress ──▶ server ──▶ /api/evaluation ──▶ (SDK key)   ──▶ public schema
 ```
 
 **Never expose the auth service directly.** Every deployment artifact here keeps it off the
@@ -91,6 +93,39 @@ second origin, and sign-in breaks.
 The two services share one database and separate by schema: Better Auth owns `auth`, the
 application owns `public`. There is no foreign key between them. `public.users` is a mirror
 maintained by a trigger, not a source — nothing in this application authors an identity.
+
+## Connecting an application
+
+Your applications read flags with an **SDK key**: a credential a program holds, scoped to one
+environment, that can read and nothing else. Issue one in the console under **Organization →
+Environments**. You have to be an admin, which the first account to sign up is.
+
+The token is shown once, when it is issued. Only a hash of it is stored, so it cannot be read back
+out — if you lose it, revoke that key and issue another.
+
+An application needs two settings: the same origin the console is on, and the key.
+
+```sh
+FEATUREFLAGS_URL=https://flags.example.com
+FEATUREFLAGS_SDK_KEY=ffs_prod_9f2a71c0d4e83b16_…
+```
+
+There is no environment to configure. The key carries it, which is why a staging key cannot read
+production no matter what it is pointed at.
+
+The endpoint underneath is `GET /api/evaluation`, which answers with the flag states for the key's
+environment and an `ETag`. Send it back as `If-None-Match` and an unchanged poll costs a 304 with no
+body — worth doing, because the answer is cached server-side for a few seconds and your poll
+interval is what decides how quickly a toggle reaches you.
+
+```sh
+curl -sS -H "Authorization: Bearer $FEATUREFLAGS_SDK_KEY" \
+  https://flags.example.com/api/evaluation
+```
+
+Revoking takes effect on the next request. Keys are never deleted, so a key that stopped working
+stays distinguishable from one that never existed, and the console shows when each was last used —
+which is what makes revoking an unfamiliar key a decision rather than a gamble.
 
 ## Migrations
 

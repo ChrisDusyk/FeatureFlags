@@ -1,8 +1,12 @@
 using FeatureFlags.Infrastructure;
 using FeatureFlags.Server.Api;
 using FeatureFlags.Server.Features.Flags.CreateFlag;
+using FeatureFlags.Server.Features.Flags.EvaluateFlags;
 using FeatureFlags.Server.Features.Flags.ListFlags;
 using FeatureFlags.Server.Features.Flags.ToggleFlag;
+using FeatureFlags.Server.Features.SdkKeys.IssueSdkKey;
+using FeatureFlags.Server.Features.SdkKeys.ListSdkKeys;
+using FeatureFlags.Server.Features.SdkKeys.RevokeSdkKey;
 using FeatureFlags.Server.Features.Users.GetCurrentUser;
 using FeatureFlags.Server.Hosting;
 using Microsoft.AspNetCore.HttpOverrides;
@@ -15,8 +19,14 @@ builder.AddSelfHostConfiguration();
 
 // Add service defaults & Aspire client integrations.
 builder.AddServiceDefaults();
+// The distributed cache is what HybridCache uses as its second tier, behind an in-process one.
+// It backs the evaluation endpoint — the only route a fleet of application servers polls, and so
+// the only one where the same answer is worth computing once for everybody.
 builder.AddRedisClientBuilder("cache")
-    .WithOutputCache();
+    .WithOutputCache()
+    .WithDistributedCache();
+
+builder.Services.AddHybridCache();
 builder.AddInfrastructure();
 builder.AddConsoleAuthentication();
 
@@ -33,6 +43,10 @@ builder.Services.AddHttpForwarder();
 builder.Services.AddScoped<CreateFlagHandler>();
 builder.Services.AddScoped<ListFlagsHandler>();
 builder.Services.AddScoped<ToggleFlagHandler>();
+builder.Services.AddScoped<EvaluateFlagsHandler>();
+builder.Services.AddScoped<IssueSdkKeyHandler>();
+builder.Services.AddScoped<ListSdkKeysHandler>();
+builder.Services.AddScoped<RevokeSdkKeyHandler>();
 builder.Services.AddScoped<GetCurrentUserHandler>();
 
 // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
@@ -103,6 +117,10 @@ app.MapForwarder("/api/auth/{**catch-all}", app.Configuration.GetAuthServiceAddr
 api.MapListFlags();
 api.MapCreateFlag();
 api.MapToggleFlag();
+api.MapEvaluateFlags();
+api.MapIssueSdkKey();
+api.MapListSdkKeys();
+api.MapRevokeSdkKey();
 api.MapGetCurrentUser();
 
 app.MapDefaultEndpoints();
