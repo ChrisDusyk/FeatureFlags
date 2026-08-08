@@ -1,5 +1,6 @@
 using System.Security.Claims;
 using FeatureFlags.Domain.Environments;
+using FeatureFlags.Domain.SdkKeys;
 using FeatureFlags.Domain.Shared;
 
 namespace FeatureFlags.Server.Api;
@@ -28,6 +29,9 @@ public static class AuthClaims
     public const string SdkKeyId = "sdk_key_id";
     public const string SdkKeyName = "sdk_key_name";
 
+    /// <summary>Whether the presented key is a secret or a publishable one.</summary>
+    public const string SdkKeyKind = "sdk_key_kind";
+
     /// <summary>The environment an SDK key is scoped to. Never present on a user's principal.</summary>
     public const string Environment = "environment";
 
@@ -49,4 +53,14 @@ public static class AuthClaims
         EnvironmentKey.Create(principal.FindFirstValue(Environment)).Match(
             Option<EnvironmentKey>.Some,
             _ => Option<EnvironmentKey>.None);
+
+    /// <summary>
+    /// Whether the presented key is publishable. False when there is no SDK key behind the request
+    /// at all, which is the safe way round: only a key that says it is publishable is treated as
+    /// one.
+    /// </summary>
+    public static bool HasPublishableSdkKey(this ClaimsPrincipal principal) =>
+        Domain.SdkKeys.SdkKeyKind.Create(principal.FindFirstValue(SdkKeyKind)).Match(
+            kind => kind.IsPublishable,
+            _ => false);
 }

@@ -63,6 +63,13 @@ spec:
               value: {{ include "featureflags.origin" . | quote }}
             - name: FEATUREFLAGS_AUTH_URL
               value: {{ include "featureflags.authAddress" . | quote }}
+            {{- with .Values.browserOrigins }}
+            # Only rendered when there is one. An installation read purely by server-side code
+            # should answer no cross-origin request at all, and an empty variable would say the
+            # same thing less clearly.
+            - name: FEATUREFLAGS_BROWSER_ORIGINS
+              value: {{ include "featureflags.browserOrigins" $ | quote }}
+            {{- end }}
             - name: FEATUREFLAGS_REDIS_URL
               value: {{ include "featureflags.redisUrl" . | quote }}
             - name: FEATUREFLAGS_APPLY_MIGRATIONS

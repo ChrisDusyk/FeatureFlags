@@ -12,6 +12,31 @@ public static class SdkKeyErrors
         "SdkKey.Name.TooLong",
         $"An SDK key name must be {SdkKey.MaxNameLength} characters or fewer.");
 
+    public static Error KindRequired => Error.Validation(
+        "SdkKey.Kind.Required",
+        $"An SDK key needs a kind: {string.Join(" or ", SdkKeyKind.All.Select(kind => $"'{kind}'"))}.");
+
+    public static Error KindUnrecognized(string value) => Error.Validation(
+        "SdkKey.Kind.Unrecognized",
+        $"'{value}' is not an SDK key kind. Use {string.Join(" or ", SdkKeyKind.All.Select(kind => $"'{kind}'"))}.");
+
+    /// <summary>
+    /// A secret key presented from a browser. The request carried an <c>Origin</c> header, which
+    /// only a browser sends, and a secret shipped to a browser is a secret no longer.
+    ///
+    /// <para>
+    /// Unlike the failures below this is deliberately explicit rather than uniform: the caller
+    /// already holds this credential, so nothing is being disclosed, and someone who has just wired
+    /// the wrong key into a web application needs to be told which mistake they made. A bare 401
+    /// would send them looking for a typo.
+    /// </para>
+    /// </summary>
+    public static Error SecretKeyFromBrowser => Error.Unauthorized(
+        "SdkKey.SecretFromBrowser",
+        "This is a secret SDK key, and the request came from a browser. Anything shipped to a " +
+        "browser is readable by everyone who receives it. Issue a publishable key for this " +
+        "application instead.");
+
     public static Error NotFound(Guid id) => Error.NotFound(
         "SdkKey.NotFound",
         $"No SDK key with the id '{id}' exists.");

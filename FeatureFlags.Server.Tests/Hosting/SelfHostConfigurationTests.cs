@@ -1,3 +1,4 @@
+using FeatureFlags.Server.Api;
 using FeatureFlags.Server.Hosting;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.FileProviders;
@@ -406,6 +407,63 @@ public class SelfHostConfigurationTests
 
         Assert.False(configuration.IsMigrateOnly());
     }
+
+    [Fact]
+    public void BrowserOrigins_AreSplitIntoTheArrayTheCorsPolicyBindsFrom()
+    {
+        var configuration = Build(new Dictionary<string, string?>
+        {
+            [SelfHostConfiguration.BrowserOriginsVariable] =
+                "https://app.example.com, https://admin.example.com"
+        });
+
+        Assert.Equal(
+            ["https://app.example.com", "https://admin.example.com"],
+            configuration.GetBrowserOrigins());
+    }
+
+    [Fact]
+    public void BrowserOrigins_AreEmptyWhenUnset() =>
+        // The right default. An installation whose flags are only read by server-side code should
+        // not be answering a cross-origin request at all.
+        Assert.Empty(Build([]).GetBrowserOrigins());
+
+    [Fact]
+    public void BrowserOrigins_DropATrailingSlashRatherThanRefusingIt() =>
+        // The same leniency FEATUREFLAGS_ORIGIN gets, from the same method. A trailing slash is
+        // what a person types, and it has one unambiguous reading — unlike a path, which does not.
+        Assert.Equal(
+            ["https://app.example.com"],
+            Build(new Dictionary<string, string?>
+            {
+                [SelfHostConfiguration.BrowserOriginsVariable] = "https://app.example.com/"
+            }).GetBrowserOrigins());
+
+    [Theory]
+    [InlineData("https://app.example.com/app")]
+    [InlineData("app.example.com")]
+    [InlineData("https://app.example.com?a=1")]
+    public void BrowserOrigins_RejectWhatCouldNeverMatchAnOriginHeader(string value)
+    {
+        // Held to the same shape as FEATUREFLAGS_ORIGIN, and for a sharper reason: a mismatch here
+        // surfaces as a browser refusing a response without explaining itself, which is among the
+        // least diagnosable failures there is. Startup can at least name the variable.
+        var exception = Assert.Throws<InvalidOperationException>(() => Build(new Dictionary<string, string?>
+        {
+            [SelfHostConfiguration.BrowserOriginsVariable] = value
+        }));
+
+        Assert.Contains("origin", exception.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void BrowserOrigins_IgnoreEmptyEntriesFromATrailingComma() =>
+        Assert.Equal(
+            ["https://app.example.com"],
+            Build(new Dictionary<string, string?>
+            {
+                [SelfHostConfiguration.BrowserOriginsVariable] = "https://app.example.com,"
+            }).GetBrowserOrigins());
 
     private static IConfiguration Build(Dictionary<string, string?> values)
     {

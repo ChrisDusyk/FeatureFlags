@@ -20,7 +20,7 @@ public class IssueSdkKeyHandlerTests
     public async Task HandleAsync_ShouldPersistTheKeyAndReturnItsToken()
     {
         var result = await CreateSut().HandleAsync(
-            new IssueSdkKeyCommand("CI", EnvironmentKey.Development, Admin),
+            new IssueSdkKeyCommand("CI", SdkKeyKind.Secret, EnvironmentKey.Development, Admin),
             TestContext.Current.CancellationToken);
 
         Assert.True(result.IsSuccess);
@@ -42,7 +42,7 @@ public class IssueSdkKeyHandlerTests
     public async Task HandleAsync_ShouldReturnATokenTheStoredKeyAccepts()
     {
         var result = await CreateSut().HandleAsync(
-            new IssueSdkKeyCommand("CI", EnvironmentKey.Production, Admin),
+            new IssueSdkKeyCommand("CI", SdkKeyKind.Secret, EnvironmentKey.Production, Admin),
             TestContext.Current.CancellationToken);
 
         var credential = SdkKeyToken.Parse(result.Value.Token);
@@ -58,7 +58,7 @@ public class IssueSdkKeyHandlerTests
     public async Task HandleAsync_WithoutAName_ShouldFailAndPersistNothing()
     {
         var result = await CreateSut().HandleAsync(
-            new IssueSdkKeyCommand("  ", EnvironmentKey.Development, Admin),
+            new IssueSdkKeyCommand("  ", SdkKeyKind.Secret, EnvironmentKey.Development, Admin),
             TestContext.Current.CancellationToken);
 
         Assert.True(result.IsFailure);
@@ -71,7 +71,7 @@ public class IssueSdkKeyHandlerTests
     public async Task HandleAsync_ShouldScopeTheKeyToTheEnvironmentAsked()
     {
         var result = await CreateSut().HandleAsync(
-            new IssueSdkKeyCommand("staging runner", EnvironmentKey.Staging, Admin),
+            new IssueSdkKeyCommand("staging runner", SdkKeyKind.Secret, EnvironmentKey.Staging, Admin),
             TestContext.Current.CancellationToken);
 
         Assert.Equal(EnvironmentKey.Staging, Assert.Single(_repository.Committed).Environment);

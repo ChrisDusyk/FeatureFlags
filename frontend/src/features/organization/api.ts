@@ -7,9 +7,18 @@
 
 import { apiFetch } from '../../auth/token';
 
+/**
+ * Whether a key is a secret or something meant to be published.
+ *
+ * A publishable key is the only kind the server accepts from a browser, because a browser cannot
+ * keep a secret — see the copy on the Environments screen, which says so where one is issued.
+ */
+export type SdkKeyKind = 'secret' | 'publishable';
+
 export interface SdkKey {
   id: string;
   name: string;
+  kind: SdkKeyKind;
   /** The environment key — 'dev', 'stg', 'prod'. */
   environment: string;
   /**
@@ -35,6 +44,7 @@ interface ListSdkKeysResponse {
 export interface IssuedSdkKey {
   id: string;
   name: string;
+  kind: SdkKeyKind;
   environment: string;
   token: string;
   createdAt: string;
@@ -105,11 +115,15 @@ export async function listSdkKeys(signal?: AbortSignal): Promise<SdkKey[]> {
   return body.keys;
 }
 
-export async function issueSdkKey(name: string, environment: string): Promise<IssuedSdkKey> {
+export async function issueSdkKey(
+  name: string,
+  kind: SdkKeyKind,
+  environment: string,
+): Promise<IssuedSdkKey> {
   const response = await send('/api/sdk-keys', {
     method: 'POST',
     headers: { 'content-type': 'application/json', accept: 'application/json' },
-    body: JSON.stringify({ name, environment }),
+    body: JSON.stringify({ name, kind, environment }),
   });
 
   return (await response.json()) as IssuedSdkKey;

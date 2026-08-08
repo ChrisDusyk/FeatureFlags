@@ -44,6 +44,11 @@ services:
       FEATUREFLAGS_DATABASE_URL: ${FEATUREFLAGS_DATABASE_URL:-postgres://featureflags:${POSTGRES_PASSWORD}@postgres:5432/featureflagsdb}
       FEATUREFLAGS_REDIS_URL: ${FEATUREFLAGS_REDIS_URL:-redis://redis:6379}
       FEATUREFLAGS_AUTH_URL: http://auth:8080
+      # Origins of web applications that read flags from a browser, comma-separated. Empty unless
+      # you have one: an installation read only by server-side code should not be answering a
+      # cross-origin request at all. A browser also needs a *publishable* key (ffp_), which is a
+      # separate choice made in the console — this only decides who may read the answer.
+      FEATUREFLAGS_BROWSER_ORIGINS: ${FEATUREFLAGS_BROWSER_ORIGINS:-}
       # Sound here specifically because this file runs one replica. Scaling `server` past one
       # means turning this off and running migrations as a step of their own.
       FEATUREFLAGS_APPLY_MIGRATIONS: "true"

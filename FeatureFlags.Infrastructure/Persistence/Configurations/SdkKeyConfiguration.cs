@@ -27,6 +27,13 @@ internal sealed class SdkKeyConfiguration : IEntityTypeConfiguration<SdkKey>
             .HasMaxLength(SdkKey.MaxNameLength)
             .IsRequired();
 
+        builder.Property(key => key.Kind)
+            .HasConversion(
+                kind => kind.Value,
+                value => SdkKeyKind.FromPersisted(value))
+            .HasMaxLength(SdkKeyKind.MaxLength)
+            .IsRequired();
+
         builder.Property(key => key.Environment)
             .HasConversion(
                 environment => environment.Value,

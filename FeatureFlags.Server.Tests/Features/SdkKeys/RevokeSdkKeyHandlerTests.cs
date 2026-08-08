@@ -18,7 +18,7 @@ public class RevokeSdkKeyHandlerTests
 
     private SdkKey Seed()
     {
-        var key = SdkKey.Issue("CI", EnvironmentKey.Development, Admin, Now).Value.Key;
+        var key = SdkKey.Issue("CI", SdkKeyKind.Secret, EnvironmentKey.Development, Admin, Now).Value.Key;
         _repository.Seed(key);
 
         return key;

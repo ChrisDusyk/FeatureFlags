@@ -10,6 +10,20 @@
 # port included, since that is what a browser actually sends.
 origin: https://flags.example.com
 
+# Origins of your own web applications that read flags from a browser.
+#
+# Empty by default, and leave it that way unless you have one: an installation whose flags are only
+# read by server-side code should not be answering a cross-origin request at all. These are whole
+# origins — scheme, host, and port if it is not the default — because that is what a browser puts
+# in an Origin header, and anything else can never match one. The chart refuses a value carrying a
+# path, and so does the server at startup.
+#
+# This decides who may *read* the answer. What a browser must *present* is a publishable key
+# (ffp_), issued in the console under Organization → Environments; a secret key is refused from a
+# browser no matter which origin it came from.
+browserOrigins: []
+  # - https://app.example.com
+
 image:
   registry: ghcr.io
   repository: chrisdusyk

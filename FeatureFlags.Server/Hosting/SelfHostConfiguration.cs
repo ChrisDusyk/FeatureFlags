@@ -26,6 +26,13 @@ public static class SelfHostConfiguration
     public const string ApplyMigrationsVariable = "FEATUREFLAGS_APPLY_MIGRATIONS";
     public const string MigrateOnlyVariable = "FEATUREFLAGS_MIGRATE_ONLY";
 
+    /// <summary>
+    /// Comma-separated origins of web applications that read flags from a browser. Empty unless a
+    /// self-hoster has one, which is the right default — an installation read only by server-side
+    /// code should not answer a cross-origin request at all.
+    /// </summary>
+    public const string BrowserOriginsVariable = "FEATUREFLAGS_BROWSER_ORIGINS";
+
     private const string DatabaseConnectionStringKey = "ConnectionStrings:featureflagsdb";
     private const string CacheConnectionStringKey = "ConnectionStrings:cache";
     private const string AuthServiceAddressKey = "services:auth:http:0";
@@ -96,6 +103,8 @@ public static class SelfHostConfiguration
             translated[OriginVariable] = NormaliseConsoleOrigin(origin.Trim());
         }
 
+        TranslateBrowserOrigins(builder.Configuration, translated);
+
         if (translated.Count > 0)
         {
             builder.Configuration.AddInMemoryCollection(translated);
@@ -152,6 +161,38 @@ public static class SelfHostConfiguration
     /// A trailing slash is different in kind: it is a correct value written the way a person
     /// writes a URL, so it is normalised rather than rejected.
     /// </summary>
+    /// <summary>
+    /// Splits <c>FEATUREFLAGS_BROWSER_ORIGINS</c> into the indexed keys configuration binds an
+    /// array from, checking each one is an origin.
+    ///
+    /// <para>
+    /// Held to exactly the same shape as <see cref="OriginVariable"/>, by the same method, because
+    /// it is compared against an <c>Origin</c> header — and a value carrying a path or a trailing
+    /// slash can never match one. That failure would surface as a browser refusing a response for
+    /// reasons it does not explain, which is among the least diagnosable things in web development.
+    /// Better to refuse it at startup, where the message can name the variable.
+    /// </para>
+    /// </summary>
+    private static void TranslateBrowserOrigins(
+        IConfiguration configuration,
+        Dictionary<string, string?> translated)
+    {
+        if (configuration[BrowserOriginsVariable] is not { Length: > 0 } configured)
+        {
+            return;
+        }
+
+        var origins = configured
+            .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Select(NormaliseConsoleOrigin)
+            .ToList();
+
+        for (var index = 0; index < origins.Count; index++)
+        {
+            translated[$"{Api.BrowserOrigins.ConfigurationKey}:{index}"] = origins[index];
+        }
+    }
+
     public static string NormaliseConsoleOrigin(string value)
     {
         var origin = value.TrimEnd('/');

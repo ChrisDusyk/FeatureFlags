@@ -16,7 +16,7 @@ public class ListSdkKeysHandlerTests
 
     private IssuedSdkKey Seed(string name, EnvironmentKey environment)
     {
-        var issued = SdkKey.Issue(name, environment, Admin, Now).Value;
+        var issued = SdkKey.Issue(name, SdkKeyKind.Secret, environment, Admin, Now).Value;
         _repository.Seed(issued.Key);
 
         return issued;

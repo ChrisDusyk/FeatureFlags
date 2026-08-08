@@ -8,8 +8,11 @@ public class SdkKeyTests
     private static readonly DateTimeOffset Now = new(2026, 8, 7, 12, 0, 0, TimeSpan.Zero);
     private static readonly Guid Admin = Guid.CreateVersion7();
 
-    private static IssuedSdkKey Issue(string name = "CI", EnvironmentKey? environment = null) =>
-        SdkKey.Issue(name, environment ?? EnvironmentKey.Development, Admin, Now).Value;
+    private static IssuedSdkKey Issue(
+        string name = "CI",
+        EnvironmentKey? environment = null,
+        SdkKeyKind? kind = null) =>
+        SdkKey.Issue(name, kind ?? SdkKeyKind.Secret, environment ?? EnvironmentKey.Development, Admin, Now).Value;
 
     [Fact]
     public void Issue_ShouldReturnAKeyAndItsToken()
@@ -21,7 +24,7 @@ public class SdkKeyTests
         Assert.Equal(Admin, issued.Key.CreatedBy);
         Assert.Equal(Now, issued.Key.CreatedAt);
         Assert.True(issued.Key.IsActive);
-        Assert.StartsWith($"{SdkKeyToken.Prefix}_prod_", issued.Token);
+        Assert.StartsWith($"{SdkKeyKind.Secret.TokenPrefix}_prod_", issued.Token);
     }
 
     [Fact]
@@ -43,7 +46,7 @@ public class SdkKeyTests
     [InlineData("   ")]
     public void Issue_WithoutAName_ShouldFail(string? name)
     {
-        var result = SdkKey.Issue(name, EnvironmentKey.Development, Admin, Now);
+        var result = SdkKey.Issue(name, SdkKeyKind.Secret, EnvironmentKey.Development, Admin, Now);
 
         Assert.True(result.IsFailure);
         Assert.Equal(SdkKeyErrors.NameRequired.Code, result.Error.Code);
@@ -52,7 +55,7 @@ public class SdkKeyTests
     [Fact]
     public void Issue_WithAnOverlongName_ShouldFail()
     {
-        var result = SdkKey.Issue(new string('a', SdkKey.MaxNameLength + 1), EnvironmentKey.Development, Admin, Now);
+        var result = SdkKey.Issue(new string('a', SdkKey.MaxNameLength + 1), SdkKeyKind.Secret, EnvironmentKey.Development, Admin, Now);
 
         Assert.True(result.IsFailure);
         Assert.Equal(SdkKeyErrors.NameTooLong.Code, result.Error.Code);

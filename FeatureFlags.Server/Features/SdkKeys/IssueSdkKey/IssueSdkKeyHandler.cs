@@ -11,6 +11,7 @@ public sealed class IssueSdkKeyHandler(ISdkKeyRepository repository, TimeProvide
     {
         var issued = SdkKey.Issue(
             command.Name,
+            command.Kind,
             command.Environment,
             command.IssuedBy,
             timeProvider.GetUtcNow());
