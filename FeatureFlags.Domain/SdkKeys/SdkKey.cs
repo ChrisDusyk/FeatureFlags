@@ -35,6 +35,7 @@ public sealed class SdkKey
     private SdkKey(
         Guid id,
         string name,
+        SdkKeyKind kind,
         EnvironmentKey environment,
         string selector,
         byte[] secretHash,
@@ -43,6 +44,7 @@ public sealed class SdkKey
     {
         Id = id;
         Name = name;
+        Kind = kind;
         Environment = environment;
         Selector = selector;
         SecretHash = secretHash;
@@ -54,6 +56,7 @@ public sealed class SdkKey
     private SdkKey()
     {
         Name = null!;
+        Kind = null!;
         Environment = null!;
         Selector = null!;
         SecretHash = null!;
@@ -63,6 +66,13 @@ public sealed class SdkKey
 
     /// <summary>What a person calls it — "CI", "web app". Not an identifier.</summary>
     public string Name { get; private set; }
+
+    /// <summary>
+    /// Whether this key is a secret or something meant to be published. It decides where the key
+    /// may be used from, not what it may read — a publishable key sees exactly what a secret one
+    /// scoped to the same environment sees.
+    /// </summary>
+    public SdkKeyKind Kind { get; private set; }
 
     /// <summary>
     /// The one environment this key can read. It comes from here and nowhere else: a request
@@ -97,6 +107,7 @@ public sealed class SdkKey
     /// </summary>
     public static Result<IssuedSdkKey> Issue(
         string? name,
+        SdkKeyKind kind,
         EnvironmentKey environment,
         Guid createdBy,
         DateTimeOffset timestamp)
@@ -108,11 +119,12 @@ public sealed class SdkKey
         if (trimmedName.Length > MaxNameLength)
             return Result.Failure<IssuedSdkKey>(SdkKeyErrors.NameTooLong);
 
-        var token = SdkKeyToken.Issue(environment);
+        var token = SdkKeyToken.Issue(kind, environment);
 
         var key = new SdkKey(
             Guid.CreateVersion7(),
             trimmedName,
+            kind,
             environment,
             token.Selector,
             token.SecretHash,

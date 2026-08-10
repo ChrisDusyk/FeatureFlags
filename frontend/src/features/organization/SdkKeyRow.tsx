@@ -30,7 +30,17 @@ export function SdkKeyRow({ sdkKey, onRevoked }: { sdkKey: SdkKey; onRevoked: ()
   return (
     <li className={`keyrow${sdkKey.isActive ? '' : ' keyrow--revoked'}`}>
       <div className="keyrow__body">
-        <p className="keyrow__name">{sdkKey.name}</p>
+        <p className="keyrow__name">
+          {sdkKey.name}
+          {/*
+            Not a colour-coded warning. Both kinds are legitimate and the badge says which one this
+            is, the way the token's own prefix does — dressing a publishable key as a hazard would
+            be wrong, since publishing it is the entire point of having one.
+          */}
+          <span className={`keybadge keybadge--${sdkKey.kind}`}>
+            {sdkKey.kind === 'publishable' ? 'Publishable' : 'Secret'}
+          </span>
+        </p>
         <code className="keyrow__hint">{sdkKey.hint}…</code>
         <p className="keyrow__meta">
           {sdkKey.revokedAt ? (

@@ -53,15 +53,40 @@ missing scheme is not: it means `origin` was read as "the console's URL" rather 
 browser sends, and no rendering of that value would work. Those fail here, where the value is set.
 */}}
 {{- define "featureflags.origin" -}}
-{{- $origin := required "origin is required, e.g. https://flags.example.com" .Values.origin | trimSuffix "/" -}}
+{{- $origin := required "origin is required, e.g. https://flags.example.com" .Values.origin -}}
+{{- include "featureflags.checkedOrigin" (dict "value" $origin "setting" "origin") -}}
+{{- end -}}
+
+{{/*
+One origin, checked and with any trailing slash removed. Takes `value` and the `setting` it came
+from, so the failure names the field the reader has to go and edit.
+
+Shared by `origin` and every entry in `browserOrigins`, because they are the same kind of value
+compared against the same header — and a rule applied to one of them but not the other is how the
+second grows a quiet exception to the first.
+*/}}
+{{- define "featureflags.checkedOrigin" -}}
+{{- $origin := .value | trimSuffix "/" -}}
+{{- $setting := .setting -}}
 {{- if not (or (hasPrefix "https://" $origin) (hasPrefix "http://" $origin)) -}}
-{{- fail (printf "origin has to start with https:// or http:// — got %q. It is the origin a browser sends, not a hostname." $origin) -}}
+{{- fail (printf "%s has to start with https:// or http:// — got %q. It is the origin a browser sends, not a hostname." $setting $origin) -}}
 {{- end -}}
 {{- $rest := $origin | trimPrefix "https://" | trimPrefix "http://" -}}
 {{- if or (contains "/" $rest) (contains "?" $rest) (contains "#" $rest) -}}
-{{- fail (printf "origin has to be a scheme, a host, and an optional port, with nothing after it — got %q. A browser never sends a path in an Origin header, so this would fail at the first sign-in rather than here. Use the ingress or your proxy to serve the console under a path if you need one." $origin) -}}
+{{- fail (printf "%s has to be a scheme, a host, and an optional port, with nothing after it — got %q. A browser never sends a path in an Origin header, so this would fail at a first request rather than here. Use the ingress or your proxy to serve the console under a path if you need one." $setting $origin) -}}
 {{- end -}}
 {{- $origin -}}
+{{- end -}}
+
+{{/*
+`browserOrigins`, each checked, joined for the environment variable the server reads.
+*/}}
+{{- define "featureflags.browserOrigins" -}}
+{{- $checked := list -}}
+{{- range .Values.browserOrigins -}}
+{{- $checked = append $checked (include "featureflags.checkedOrigin" (dict "value" . "setting" "browserOrigins")) -}}
+{{- end -}}
+{{- join "," $checked -}}
 {{- end -}}
 
 {{- define "featureflags.serverImage" -}}

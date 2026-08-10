@@ -70,6 +70,7 @@ internal sealed class SdkKeyAuthenticationHandler(
             [
                 new Claim(AuthClaims.SdkKeyId, key.Id.ToString()),
                 new Claim(AuthClaims.SdkKeyName, key.Name),
+                new Claim(AuthClaims.SdkKeyKind, key.Kind.Value),
                 new Claim(AuthClaims.Environment, key.Environment.Value)
             ],
             AuthSchemes.SdkKey,

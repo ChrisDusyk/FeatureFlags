@@ -15,6 +15,15 @@ public static class EvaluateFlagsEndpoint
             EvaluateFlagsHandler handler,
             CancellationToken cancellationToken) =>
         {
+            // Before anything is read: a secret key presented from a browser is refused outright,
+            // whatever it was asking for. See BrowserCredentialRule.
+            var credential = BrowserCredentialRule.Check(context);
+
+            if (credential.IsFailure)
+            {
+                return credential.Error.ToProblem();
+            }
+
             // The policy already guarantees an SDK key authenticated this request, so a missing
             // environment claim is this server contradicting itself rather than a caller's mistake.
             // It still has to be answered for rather than assumed, which is what Option is for.
@@ -35,6 +44,7 @@ public static class EvaluateFlagsEndpoint
                 error => error.ToProblem());
         })
         .RequireAuthorization(AuthPolicies.SdkKey)
+        .RequireCors(BrowserOrigins.PolicyName)
         .WithName("EvaluateFlags")
         .WithSummary("Every flag's state in the environment the presented SDK key is scoped to.")
         .Produces<EvaluateFlagsResponse>()

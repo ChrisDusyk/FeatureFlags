@@ -32,6 +32,7 @@ builder.AddConsoleAuthentication();
 
 // Add services to the container.
 builder.Services.AddProblemDetails();
+builder.Services.AddBrowserCors(builder.Configuration);
 builder.Services.AddSingleton<TimeProvider>(TimeProvider.System);
 
 // Better Auth runs in its own Node process. Forwarding to it from here rather than exposing it
@@ -102,6 +103,14 @@ if (app.Configuration.IsMigrateOnly())
 }
 
 app.UseOutputCache();
+
+app.UseRouting();
+
+// Between authentication and authorization: after UseRouting so the endpoint's RequireCors
+// metadata has been resolved, and before the endpoint runs so a preflight is answered without
+// reaching it. A preflight carries no credential, which is why the key-kind rule lives in the
+// endpoint rather than here — see EvaluateFlagsEndpoint.
+app.UseCors();
 
 app.UseAuthentication();
 app.UseAuthorization();

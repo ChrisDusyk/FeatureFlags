@@ -8,12 +8,12 @@ public class SdkKeyTokenTests
     [Fact]
     public void Issue_ShouldProduceTheDocumentedShape()
     {
-        var token = SdkKeyToken.Issue(EnvironmentKey.Development);
+        var token = SdkKeyToken.Issue(SdkKeyKind.Secret, EnvironmentKey.Development);
 
         var segments = token.Value.Split('_');
 
         Assert.Equal(4, segments.Length);
-        Assert.Equal(SdkKeyToken.Prefix, segments[0]);
+        Assert.Equal(SdkKeyKind.Secret.TokenPrefix, segments[0]);
         Assert.Equal(EnvironmentKey.Development.Value, segments[1]);
         Assert.Equal(token.Selector, segments[2]);
     }
@@ -27,7 +27,7 @@ public class SdkKeyTokenTests
     [Fact]
     public void Issue_ShouldProduceSegmentsOfTheLengthsTheParserExpects()
     {
-        var token = SdkKeyToken.Issue(EnvironmentKey.Production);
+        var token = SdkKeyToken.Issue(SdkKeyKind.Secret, EnvironmentKey.Production);
 
         var segments = token.Value.Split('_');
 
@@ -38,7 +38,7 @@ public class SdkKeyTokenTests
     [Fact]
     public void Issue_ShouldProduceATokenThatParses()
     {
-        var token = SdkKeyToken.Issue(EnvironmentKey.Staging);
+        var token = SdkKeyToken.Issue(SdkKeyKind.Secret, EnvironmentKey.Staging);
 
         var parsed = SdkKeyToken.Parse(token.Value);
 
@@ -60,7 +60,7 @@ public class SdkKeyTokenTests
         {
             for (var attempt = 0; attempt < 200; attempt++)
             {
-                var token = SdkKeyToken.Issue(environment);
+                var token = SdkKeyToken.Issue(SdkKeyKind.Secret, environment);
 
                 var parsed = SdkKeyToken.Parse(token.Value);
 
@@ -74,7 +74,7 @@ public class SdkKeyTokenTests
     public void Issue_ShouldNotRepeatItself()
     {
         var tokens = Enumerable.Range(0, 50)
-            .Select(_ => SdkKeyToken.Issue(EnvironmentKey.Development))
+            .Select(_ => SdkKeyToken.Issue(SdkKeyKind.Secret, EnvironmentKey.Development))
             .ToList();
 
         Assert.Equal(50, tokens.Select(token => token.Selector).Distinct().Count());
@@ -84,7 +84,7 @@ public class SdkKeyTokenTests
     [Fact]
     public void Issue_ShouldNotStoreTheSecret()
     {
-        var token = SdkKeyToken.Issue(EnvironmentKey.Development);
+        var token = SdkKeyToken.Issue(SdkKeyKind.Secret, EnvironmentKey.Development);
 
         var secret = token.Value.Split('_')[3];
 
@@ -112,7 +112,7 @@ public class SdkKeyTokenTests
     [Fact]
     public void Parse_WithAnExtraSegment_ShouldFail()
     {
-        var token = SdkKeyToken.Issue(EnvironmentKey.Development);
+        var token = SdkKeyToken.Issue(SdkKeyKind.Secret, EnvironmentKey.Development);
 
         Assert.True(SdkKeyToken.Parse($"{token.Value}_extra").IsFailure);
     }
@@ -120,11 +120,11 @@ public class SdkKeyTokenTests
     [Fact]
     public void Parse_ShouldHashTheSecretItWasGiven()
     {
-        var first = SdkKeyToken.Issue(EnvironmentKey.Development);
-        var second = SdkKeyToken.Issue(EnvironmentKey.Development);
+        var first = SdkKeyToken.Issue(SdkKeyKind.Secret, EnvironmentKey.Development);
+        var second = SdkKeyToken.Issue(SdkKeyKind.Secret, EnvironmentKey.Development);
 
         // Same shape, different secret: the hashes have to differ, or verification means nothing.
-        var swapped = $"{SdkKeyToken.Prefix}_dev_{first.Selector}_{second.Value.Split('_')[3]}";
+        var swapped = $"{SdkKeyKind.Secret.TokenPrefix}_dev_{first.Selector}_{second.Value.Split('_')[3]}";
 
         var parsed = SdkKeyToken.Parse(swapped);
 
@@ -136,11 +136,30 @@ public class SdkKeyTokenTests
     [Theory]
     [InlineData("ffs_dev_abc", true)]
     [InlineData("ffs_", true)]
+    [InlineData("ffx_dev_abc", true)]
+    [InlineData("ff_dev_abc", false)]
+    [InlineData("ffsx_dev_abc", false)]
     [InlineData("eyJhbGciOiJFUzI1NiJ9.eyJzdWIiOiIxIn0.signature", false)]
     [InlineData("", false)]
     [InlineData(null, false)]
     public void LooksLikeSdkKey_ShouldTellTheTwoCredentialKindsApart(string? value, bool expected) =>
         Assert.Equal(expected, SdkKeyToken.LooksLikeSdkKey(value));
+
+    /// <summary>
+    /// Routing has to be at least as permissive as parsing, or a token this build cannot name the
+    /// kind of would be handed to the JWT handler and rejected without its row ever being read —
+    /// which is the one thing the prefix is explicitly not allowed to decide.
+    /// </summary>
+    [Fact]
+    public void LooksLikeSdkKey_ShouldAcceptAnyPrefixThatParses()
+    {
+        var token = SdkKeyToken.Issue(SdkKeyKind.Secret, EnvironmentKey.Development);
+
+        var unknownKind = string.Concat("ffx", token.Value.AsSpan(3));
+
+        Assert.True(SdkKeyToken.Parse(unknownKind).IsSuccess);
+        Assert.True(SdkKeyToken.LooksLikeSdkKey(unknownKind));
+    }
 
     /// <summary>
     /// The environment segment is decoration — the row decides. A token naming an environment this
@@ -150,7 +169,7 @@ public class SdkKeyTokenTests
     [Fact]
     public void Parse_ShouldNotJudgeTheEnvironmentSegment()
     {
-        var token = SdkKeyToken.Issue(EnvironmentKey.Development);
+        var token = SdkKeyToken.Issue(SdkKeyKind.Secret, EnvironmentKey.Development);
 
         var renamed = token.Value.Replace("_dev_", "_retired-environment_");
 

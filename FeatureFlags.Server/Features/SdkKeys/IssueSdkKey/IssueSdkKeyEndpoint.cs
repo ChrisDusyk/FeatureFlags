@@ -1,5 +1,6 @@
 using System.Security.Claims;
 using FeatureFlags.Domain.Environments;
+using FeatureFlags.Domain.SdkKeys;
 using FeatureFlags.Domain.Shared;
 using FeatureFlags.Domain.Users;
 using FeatureFlags.Server.Api;
@@ -23,6 +24,13 @@ public static class IssueSdkKeyEndpoint
                 return environment.Error.ToProblem();
             }
 
+            var kind = SdkKeyKind.Create(request.Kind);
+
+            if (kind.IsFailure)
+            {
+                return kind.Error.ToProblem();
+            }
+
             var issuedBy = principal.GetUserId().ToResult(UserErrors.NotProvisioned);
 
             if (issuedBy.IsFailure)
@@ -31,7 +39,7 @@ public static class IssueSdkKeyEndpoint
             }
 
             var result = await handler.HandleAsync(
-                new IssueSdkKeyCommand(request.Name, environment.Value, issuedBy.Value),
+                new IssueSdkKeyCommand(request.Name, kind.Value, environment.Value, issuedBy.Value),
                 cancellationToken);
 
             return result.Match(

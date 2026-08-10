@@ -24,6 +24,7 @@ public class IssueSdkKeyResultTests
     private static readonly IssueSdkKeyResponse Response = new(
         Guid.CreateVersion7(),
         "CI",
+        "secret",
         "dev",
         "ffs_dev_f992c8928754087a_7f097037aa14d671f4317df877989f05f5309c1323ecb24dab4be5597f40db10",
         new DateTimeOffset(2026, 8, 7, 12, 0, 0, TimeSpan.Zero));

@@ -103,6 +103,42 @@ Environments**. You have to be an admin, which the first account to sign up is.
 The token is shown once, when it is issued. Only a hash of it is stored, so it cannot be read back
 out — if you lose it, revoke that key and issue another.
 
+### Two kinds of key
+
+The console asks where the key will run, and the answer decides which kind you get:
+
+| | | |
+|---|---|---|
+| `ffs_…` | **secret** | a backend, a container, a CI job — anywhere only you can read it |
+| `ffp_…` | **publishable** | a web or mobile app, where the key is shipped to the user |
+
+Both read exactly the same thing. What differs is where each may be used from, and the server
+enforces it: a request carrying an `Origin` header came from a browser, and a secret key presented
+from one is refused. That is checked here rather than left to CORS, because a key published in a
+JavaScript bundle can be copied out of it and replayed from anywhere.
+
+**A publishable key is public.** Anyone who loads your app can read it, and with it every flag key
+in that environment and whether each one is on. That is the trade — flag names travel further than
+people expect, so name them accordingly.
+
+### Reading flags from a browser
+
+A browser also needs the server to allow its origin, which is `FEATUREFLAGS_BROWSER_ORIGINS`:
+
+```sh
+FEATUREFLAGS_BROWSER_ORIGINS=https://app.example.com,https://admin.example.com
+```
+
+Empty by default, and leave it so unless you have such an app — an installation read only by
+server-side code should not be answering a cross-origin request at all. Each entry is a whole
+origin, scheme included, because that is what a browser sends; a value carrying a path is refused
+at startup, and by the Helm chart while templating.
+
+The two settings are separate on purpose. The origin list decides who may *read* the answer; the
+key kind decides what may be *presented*. Neither substitutes for the other.
+
+### Connecting
+
 An application needs two settings: the same origin the console is on, and the key.
 
 ```sh

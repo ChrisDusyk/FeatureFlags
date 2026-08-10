@@ -1,4 +1,5 @@
 using FeatureFlags.Domain.Environments;
+using FeatureFlags.Domain.SdkKeys;
 
 namespace FeatureFlags.Server.Features.SdkKeys.IssueSdkKey;
 
@@ -6,4 +7,8 @@ namespace FeatureFlags.Server.Features.SdkKeys.IssueSdkKey;
 /// Issues a key for one environment on behalf of the admin who asked.
 /// <see cref="IssuedBy"/> comes from the caller's token, never from the request body.
 /// </summary>
-public sealed record IssueSdkKeyCommand(string? Name, EnvironmentKey Environment, Guid IssuedBy);
+public sealed record IssueSdkKeyCommand(
+    string? Name,
+    SdkKeyKind Kind,
+    EnvironmentKey Environment,
+    Guid IssuedBy);
