@@ -79,14 +79,20 @@ public sealed partial class SdkKeyToken
     }
 
     /// <summary>
-    /// Whether a presented credential is shaped like an SDK key at all. Cheap and total: a JWT is
-    /// dot-separated base64url and can never begin with one of these prefixes, so the server can
-    /// route a credential to the right authentication scheme without parsing it or touching the
-    /// database.
+    /// Whether a presented credential is shaped like an SDK key at all. Cheap and total: a JWT's
+    /// first segment is base64url of <c>{"alg"…</c> and so always begins <c>ey</c>, which no prefix
+    /// of this shape can, so the server can route a credential to the right authentication scheme
+    /// without parsing it or touching the database.
+    ///
+    /// <para>
+    /// Matched on the same loose prefix shape as <see cref="TokenPattern"/>, and deliberately not on
+    /// <see cref="SdkKeyKind.All"/>: a token whose kind this build does not know has to reach the
+    /// scheme that can look its row up, not the JWT handler that can only reject it. Routing is the
+    /// one decision made before the row is read, so it has to be the loosest of the three.
+    /// </para>
     /// </summary>
     public static bool LooksLikeSdkKey(string? value) =>
-        value is not null &&
-        SdkKeyKind.All.Any(kind => value.StartsWith($"{kind.TokenPrefix}_", StringComparison.Ordinal));
+        value is not null && PrefixPattern().IsMatch(value);
 
     /// <summary>
     /// Splits a presented token into the parts needed to verify it. Every malformed token fails the
@@ -127,6 +133,14 @@ public sealed partial class SdkKeyToken
     /// </summary>
     [GeneratedRegex(@"^ff[a-z]_[a-z0-9-]+_[a-f0-9]{16}_[a-f0-9]{64}$")]
     private static partial Regex TokenPattern();
+
+    /// <summary>
+    /// The leading shape of <see cref="TokenPattern"/>, spelled out again because an attribute
+    /// argument has to be a literal. <c>SdkKeyTokenTests</c> holds the two to each other: anything
+    /// this matches must be able to go on and match the whole pattern.
+    /// </summary>
+    [GeneratedRegex(@"^ff[a-z]_")]
+    private static partial Regex PrefixPattern();
 }
 
 /// <summary>

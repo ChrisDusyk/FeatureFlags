@@ -150,18 +150,6 @@ public static class SelfHostConfiguration
     }
 
     /// <summary>
-    /// Checks that a configured origin is one, and removes a trailing slash.
-    ///
-    /// What this cannot check is the thing most likely to be wrong — whether the value matches
-    /// the URL in someone's address bar. It can check that no value would: a hostname with no
-    /// scheme, or an origin carrying a path, never appears in an <c>Origin</c> header, so it
-    /// cannot match whatever the browser sends. Those fail here rather than at a first sign-in
-    /// that reports only <c>INVALID_ORIGIN</c>.
-    ///
-    /// A trailing slash is different in kind: it is a correct value written the way a person
-    /// writes a URL, so it is normalised rather than rejected.
-    /// </summary>
-    /// <summary>
     /// Splits <c>FEATUREFLAGS_BROWSER_ORIGINS</c> into the indexed keys configuration binds an
     /// array from, checking each one is an origin.
     ///
@@ -193,6 +181,22 @@ public static class SelfHostConfiguration
         }
     }
 
+    /// <summary>
+    /// Checks that a configured origin is one, and removes a trailing slash.
+    ///
+    /// <para>
+    /// What this cannot check is the thing most likely to be wrong — whether the value matches
+    /// the URL in someone's address bar. It can check that no value would: a hostname with no
+    /// scheme, or an origin carrying a path, never appears in an <c>Origin</c> header, so it
+    /// cannot match whatever the browser sends. Those fail here rather than at a first sign-in
+    /// that reports only <c>INVALID_ORIGIN</c>.
+    /// </para>
+    ///
+    /// <para>
+    /// A trailing slash is different in kind: it is a correct value written the way a person
+    /// writes a URL, so it is normalised rather than rejected.
+    /// </para>
+    /// </summary>
     public static string NormaliseConsoleOrigin(string value)
     {
         var origin = value.TrimEnd('/');

@@ -136,11 +136,30 @@ public class SdkKeyTokenTests
     [Theory]
     [InlineData("ffs_dev_abc", true)]
     [InlineData("ffs_", true)]
+    [InlineData("ffx_dev_abc", true)]
+    [InlineData("ff_dev_abc", false)]
+    [InlineData("ffsx_dev_abc", false)]
     [InlineData("eyJhbGciOiJFUzI1NiJ9.eyJzdWIiOiIxIn0.signature", false)]
     [InlineData("", false)]
     [InlineData(null, false)]
     public void LooksLikeSdkKey_ShouldTellTheTwoCredentialKindsApart(string? value, bool expected) =>
         Assert.Equal(expected, SdkKeyToken.LooksLikeSdkKey(value));
+
+    /// <summary>
+    /// Routing has to be at least as permissive as parsing, or a token this build cannot name the
+    /// kind of would be handed to the JWT handler and rejected without its row ever being read —
+    /// which is the one thing the prefix is explicitly not allowed to decide.
+    /// </summary>
+    [Fact]
+    public void LooksLikeSdkKey_ShouldAcceptAnyPrefixThatParses()
+    {
+        var token = SdkKeyToken.Issue(SdkKeyKind.Secret, EnvironmentKey.Development);
+
+        var unknownKind = string.Concat("ffx", token.Value.AsSpan(3));
+
+        Assert.True(SdkKeyToken.Parse(unknownKind).IsSuccess);
+        Assert.True(SdkKeyToken.LooksLikeSdkKey(unknownKind));
+    }
 
     /// <summary>
     /// The environment segment is decoration — the row decides. A token naming an environment this
