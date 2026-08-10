@@ -1,6 +1,6 @@
 import { SecretKeyInBrowserError } from './errors.js';
 import { fetchEvaluation, type FlagSnapshot } from './internal/evaluation.js';
-import { isBrowser, unref } from './internal/runtime.js';
+import { deadline, isBrowser, unref } from './internal/runtime.js';
 import { resolveOptions, SECRET_KEY_PREFIX, type FeatureFlagsOptions } from './options.js';
 
 /**
@@ -23,6 +23,10 @@ export interface FeatureFlagClient {
   /**
    * Refetches now, rather than waiting for the polling interval. Unlike the background refresh,
    * this rejects when the fetch fails — an explicit request reports what happened.
+   *
+   * Every failure is a `FeatureFlagsError`: a refused key, an error status, an unreadable body, a
+   * server that could not be reached, or one that did not answer in time. One type to catch,
+   * whichever of those it was.
    */
   refresh(): Promise<void>;
 
@@ -52,14 +56,17 @@ export function createFeatureFlagsClient(options: FeatureFlagsOptions): FeatureF
   const lifetime = new AbortController();
 
   async function load(): Promise<void> {
-    const timeout = AbortSignal.timeout(resolved.timeout);
-    const signal = AbortSignal.any([lifetime.signal, timeout]);
+    const attempt = deadline(lifetime.signal, resolved.timeout);
 
-    const fetched = await fetchEvaluation(resolved, snapshot, signal);
+    try {
+      const fetched = await fetchEvaluation(resolved, snapshot, attempt);
 
-    // Null is a 304: the answer is unchanged, so only its age moves. Without re-stamping, an
-    // unchanged snapshot would look stale forever and be refetched on every read.
-    snapshot = fetched ?? (snapshot ? { ...snapshot, fetchedAt: Date.now() } : null);
+      // Null is a 304: the answer is unchanged, so only its age moves. Without re-stamping, an
+      // unchanged snapshot would look stale forever and be refetched on every read.
+      snapshot = fetched ?? (snapshot ? { ...snapshot, fetchedAt: Date.now() } : null);
+    } finally {
+      attempt.settle();
+    }
   }
 
   /**

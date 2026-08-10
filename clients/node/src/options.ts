@@ -119,9 +119,28 @@ function requireOrigin(value: string): string {
     );
   }
 
+  // A credential in the URL is not one this client can use — the SDK key is the credential, and it
+  // travels in a header. What it would do instead is ride along in anything that logs the address.
+  if (url.username.length > 0 || url.password.length > 0) {
+    throw new TypeError(
+      'FeatureFlags: baseAddress must not carry a username or password. The SDK key is the credential.',
+    );
+  }
+
+  // A path is kept, because an installation may be served under one. A query or a fragment is not:
+  // relative resolution drops both, so keeping them would mean an address that reads one way and
+  // requests another. Refused for the same reason the server refuses them in FEATUREFLAGS_ORIGIN.
+  if (url.search.length > 0 || url.hash.length > 0) {
+    throw new TypeError(
+      'FeatureFlags: baseAddress must be an address, with no query string or fragment.',
+    );
+  }
+
   // A trailing slash, so URL composition keeps any path the installation is served under instead
   // of dropping its last segment.
-  return url.href.endsWith('/') ? url.href : `${url.href}/`;
+  const address = `${url.origin}${url.pathname}`;
+
+  return address.endsWith('/') ? address : `${address}/`;
 }
 
 function requireSdkKey(value: string): string {

@@ -70,4 +70,44 @@ describe('options', () => {
     expect(flags).toBeDefined();
     flags.close();
   });
+
+  /** The SDK key is the credential, and it travels in a header. This one would only ride along in
+   * whatever logs the address. */
+  it('rejects a base address carrying a credential', () => {
+    expect(() => build({ baseAddress: 'https://admin:hunter2@flags.example.com' })).toThrow(
+      /username or password/,
+    );
+    expect(() => build({ baseAddress: 'https://admin@flags.example.com' })).toThrow(
+      /username or password/,
+    );
+  });
+
+  /**
+   * Relative resolution drops both, so an address carrying either would read one way and request
+   * another. Better to say so than to quietly ignore half of what was configured.
+   */
+  it('rejects a base address carrying a query string or a fragment', () => {
+    expect(() => build({ baseAddress: 'https://flags.example.com/?tenant=acme' })).toThrow(
+      /query string or fragment/,
+    );
+    expect(() => build({ baseAddress: 'https://flags.example.com/#top' })).toThrow(
+      /query string or fragment/,
+    );
+  });
+
+  it('keeps a path the installation is served under', async () => {
+    const server = new StubServer().withFlags({ on: true }, '"v1"');
+
+    const flags = createFeatureFlagsClient({
+      baseAddress: 'https://example.com/flags',
+      sdkKey: KEY,
+      fetch: server.fetch,
+    });
+
+    await flags.refresh();
+
+    expect(server.requests[0]?.url).toBe('https://example.com/flags/api/evaluation');
+
+    flags.close();
+  });
 });

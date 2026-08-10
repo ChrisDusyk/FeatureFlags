@@ -7,7 +7,9 @@ installation. Runs on a server or in a browser.
 pnpm add @featureflags/client
 ```
 
-ESM only. Node 20.19+ / 22.12+, and any browser with `fetch`.
+ESM only, published as ES2023. Node 20.19+ / 22.12+, and any browser with `fetch` — the client
+builds its request deadlines out of `AbortController` rather than the much newer `AbortSignal.any`,
+so the floor stays where `fetch` put it.
 
 ## Use
 
@@ -78,7 +80,7 @@ stop polling explicitly; the client keeps answering from its last snapshot after
 
 | | | |
 |---|---|---|
-| `baseAddress` | — | The origin the console is on. Required. |
+| `baseAddress` | — | The origin the console is on. A path is kept, so an installation served under one works; a credential, query string, or fragment is refused. Required. |
 | `sdkKey` | — | Issued in the console. Required. |
 | `pollingInterval` | `30000` | Upper bound, in ms, on how long a toggle takes to arrive. |
 | `timeout` | `10000` | How long one refresh may take, in ms. |

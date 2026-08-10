@@ -113,6 +113,23 @@ describe('when the server cannot be read', () => {
     flags.close();
   });
 
+  /**
+   * One error type out of `refresh()`, whatever went wrong. A timeout used to reject with the
+   * `AbortError` `fetch` produces, so `catch (e) { if (e instanceof FeatureFlagsError) … }` held for
+   * a server answering 500 and not for one answering too slowly — the failure most worth catching.
+   */
+  it('reports a timeout as a FeatureFlagsError, like every other failure', async () => {
+    const server = new StubServer().withFlags({ on: true }, '"v1"');
+    server.delay = 5_000;
+
+    const flags = client(server, { timeout: 50 });
+
+    await expect(flags.refresh()).rejects.toBeInstanceOf(FeatureFlagsError);
+    await expect(flags.refresh()).rejects.toThrow(/did not answer within 50ms/);
+
+    flags.close();
+  });
+
   it('reports the failure from refresh, which asked explicitly', async () => {
     const server = new StubServer().withStatus(500);
     const flags = client(server);

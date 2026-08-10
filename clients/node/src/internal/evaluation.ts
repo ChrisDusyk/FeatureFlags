@@ -1,5 +1,6 @@
 import { FeatureFlagsError } from '../errors.js';
 import type { ResolvedOptions } from '../options.js';
+import type { Deadline } from './runtime.js';
 
 /**
  * One version of the answer, whole. Replaced rather than mutated, so a refresh landing mid-read
@@ -28,7 +29,7 @@ interface EvaluationPayload {
 export async function fetchEvaluation(
   options: ResolvedOptions,
   current: FlagSnapshot | null,
-  signal: AbortSignal,
+  attempt: Deadline,
 ): Promise<FlagSnapshot | null> {
   const headers: Record<string, string> = {
     accept: 'application/json',
@@ -44,9 +45,25 @@ export async function fetchEvaluation(
   let response: Response;
 
   try {
-    response = await options.fetch(new URL(PATH, options.baseAddress), { headers, signal });
+    response = await options.fetch(new URL(PATH, options.baseAddress), {
+      headers,
+      signal: attempt.signal,
+    });
   } catch (cause) {
-    if (signal.aborted) {
+    // A timeout is a way of not reaching the server, so it is reported as one. What `fetch` rejects
+    // an abort with is an `AbortError` — a different type from every other failure here, which
+    // would have made "catch a FeatureFlagsError" true of a slow server but not a stopped one.
+    if (attempt.expired) {
+      throw new FeatureFlagsError(
+        `FeatureFlags: the server did not answer within ${options.timeout}ms.`,
+        0,
+        { cause },
+      );
+    }
+
+    // The other abort is close(), which is a cancellation the caller asked for. Wrapping that would
+    // dress up a request nobody is waiting for any more as an outage.
+    if (attempt.signal.aborted) {
       throw cause;
     }
 
