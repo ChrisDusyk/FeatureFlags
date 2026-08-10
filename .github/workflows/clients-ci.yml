@@ -1,0 +1,97 @@
+name: clients-ci
+
+# The two client libraries, together in one workflow the way sdk-release.yml has them: they are one
+# surface, versioned on their own tags against `GET /api/evaluation` and the SDK key format rather
+# than against the platform. Nothing else builds them on a pull request — server-ci builds
+# FeatureFlags.sln, which contains the .NET client incidentally, but its path filter never fires on
+# a change under clients/, and no workflow at all knew about clients/node.
+#
+# Both jobs run whenever either client changes, because a path filter is per workflow and not per
+# job. Splitting them to avoid a spare minute of a runner would mean two files that have to be kept
+# in step, which costs more than the minute.
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "clients/**"
+      - "Directory.Build.props"
+      - "global.json"
+      - "nuget.config"
+      - ".github/workflows/clients-ci.yml"
+  push:
+    branches: [main]
+    paths:
+      - "clients/**"
+      - "Directory.Build.props"
+      - "global.json"
+      - "nuget.config"
+      - ".github/workflows/clients-ci.yml"
+
+concurrency:
+  group: clients-ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  dotnet:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "10.0.x"
+
+      - name: Cache NuGet packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.nuget/packages
+          key: nuget-${{ runner.os }}-${{ hashFiles('**/*.csproj') }}
+          restore-keys: |
+            nuget-${{ runner.os }}-
+
+      # The library, explicitly, because it multi-targets netstandard2.0, net8.0, and net10.0 — and
+      # a ProjectReference from the net10.0 test project only ever builds the net10.0 one. Building
+      # through the tests alone would ship two target frameworks that nothing had compiled.
+      - name: Build every target framework
+        run: dotnet build clients/dotnet/FeatureFlags.Client --configuration Release
+
+      - name: Test
+        run: dotnet test clients/dotnet/FeatureFlags.Client.Tests --configuration Release
+
+  node:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: clients/node
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: clients/node/package.json
+          cache: pnpm
+          cache-dependency-path: clients/node/pnpm-lock.yaml
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # `tsc -b` is the type check as well as the build: it compiles to dist/, which is what the
+      # published package actually contains.
+      - name: Build
+        run: pnpm build
+
+      - name: Test
+        run: pnpm test
+
+      - name: Lint
+        run: pnpm lint

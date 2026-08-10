@@ -9,7 +9,10 @@ clients/node/      @featureflags/client        → npm
 
 The release plumbing is in `.github/workflows/sdk-release.yml`, on the tag prefixes
 `sdk-dotnet-v*` and `sdk-node-v*`. The OpenAPI document is produced at build time and attached to
-every platform release.
+every platform release. `.github/workflows/clients-ci.yml` is the pull-request side of the same
+pair — both packages built, tested, and linted on any change under `clients/`. The .NET job builds
+the library on its own rather than through its tests, because it multi-targets and a
+`ProjectReference` from the `net10.0` test project only ever builds the `net10.0` one.
 
 ## What a client talks to
 

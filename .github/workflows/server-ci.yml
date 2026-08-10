@@ -11,6 +11,8 @@ on:
       - "FeatureFlags.Server/**"
       - "FeatureFlags.Server.Tests/**"
       - "FeatureFlags.sln"
+      - "Directory.Build.props"
+      - "global.json"
       - "nuget.config"
       - ".github/workflows/server-ci.yml"
   push:
@@ -23,6 +25,8 @@ on:
       - "FeatureFlags.Server/**"
       - "FeatureFlags.Server.Tests/**"
       - "FeatureFlags.sln"
+      - "Directory.Build.props"
+      - "global.json"
       - "nuget.config"
       - ".github/workflows/server-ci.yml"
 
