@@ -13,9 +13,15 @@ obj\\Debug/
 # Aspire
 **/obj/.aspire/
 
-# Node / frontend
-frontend/node_modules/
-frontend/dist/
+# Node
+#
+# Unanchored, so they match at any depth. These were once scoped to frontend/, which held for as
+# long as frontend/ was the only JavaScript in the tree — auth/ and clients/node/ each carry their
+# own .gitignore, and a directory is only covered from the commit that adds one. Checking out a
+# branch from before that commit leaves the build output on disk with nothing ignoring it, which is
+# how 3,900 files of node_modules once landed in a commit about SDK keys.
+node_modules/
+dist/
 *.log
 npm-debug.log*
 pnpm-debug.log*
