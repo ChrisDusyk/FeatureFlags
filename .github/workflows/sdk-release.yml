@@ -9,8 +9,7 @@ name: sdk-release
 # on a different clock than the platform — lockstep would mean a no-op package release on every
 # platform bump.
 #
-# The .NET package exists. The node one does not yet, and its job fails loudly rather than
-# silently publishing nothing if a tag is pushed before it lands.
+# Both packages exist.
 
 on:
   push:
@@ -60,13 +59,6 @@ jobs:
       id-token: write
     steps:
       - uses: actions/checkout@v4
-
-      - name: Check the package exists
-        run: |
-          if [ ! -d clients/node ]; then
-            echo "::error::clients/node does not exist yet — see clients/README.md."
-            exit 1
-          fi
 
       - uses: pnpm/action-setup@v4
         with:

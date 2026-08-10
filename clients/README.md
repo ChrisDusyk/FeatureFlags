@@ -9,7 +9,10 @@ clients/node/      @featureflags/client        → npm
 
 The release plumbing is in `.github/workflows/sdk-release.yml`, on the tag prefixes
 `sdk-dotnet-v*` and `sdk-node-v*`. The OpenAPI document is produced at build time and attached to
-every platform release.
+every platform release. `.github/workflows/clients-ci.yml` is the pull-request side of the same
+pair — both packages built, tested, and linted on any change under `clients/`. The .NET job builds
+the library on its own rather than through its tests, because it multi-targets and a
+`ProjectReference` from the `net10.0` test project only ever builds the `net10.0` one.
 
 ## What a client talks to
 
@@ -25,6 +28,16 @@ Two things had to land in the platform first, and both have:
 
 A client therefore needs exactly two settings — the origin and the key — and polls one endpoint.
 The environment is not configurable because the key carries it.
+
+## Two kinds of key
+
+`ffs_` keys are secret and server-side only. `ffp_` keys are publishable and may be shipped to a
+browser. Both read the same thing; the kind decides where a key may be used *from*, and the server
+enforces it — a request carrying an `Origin` header must present a publishable key.
+
+The node client runs in both places and refuses to start with a secret key in a browser, so the
+mistake surfaces at the line that configured it rather than as a 401 after the key is already in a
+bundle. The .NET client is server-side only and has no such check to make.
 
 The admin endpoints (`GET /api/flags?environment=`, `POST /api/flags`, `PUT /api/flags/{key}/state`,
 `GET /api/users/me`, the `sdk-keys` routes) are **closed to SDK keys**. They are the console's, they
