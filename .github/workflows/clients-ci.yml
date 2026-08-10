@@ -11,8 +11,10 @@ name: clients-ci
 # in step, which costs more than the minute.
 
 on:
+  # No branch filter: pull requests stack here — a client PR based on the platform PR it needs —
+  # and a base other than main is the case that most wants a build, not least one. `push` stays
+  # pinned to main, because that is the post-merge run.
   pull_request:
-    branches: [main]
     paths:
       - "clients/**"
       - "Directory.Build.props"
