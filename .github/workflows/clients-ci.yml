@@ -54,14 +54,21 @@ jobs:
           restore-keys: |
             nuget-${{ runner.os }}-
 
-      # The library, explicitly, because it multi-targets netstandard2.0, net8.0, and net10.0 — and
-      # a ProjectReference from the net10.0 test project only ever builds the net10.0 one. Building
-      # through the tests alone would ship two target frameworks that nothing had compiled.
+      # The libraries, explicitly, because they multi-target netstandard2.0, net8.0, and net10.0 —
+      # and a ProjectReference from the net10.0 test projects only ever builds the net10.0 one.
+      # Building through the tests alone would ship target frameworks nothing had compiled.
       - name: Build every target framework
-        run: dotnet build clients/dotnet/FeatureFlags.Client --configuration Release
+        run: |
+          dotnet build clients/dotnet/FeatureFlags.Client --configuration Release
+          dotnet build clients/dotnet/FeatureFlags.Client.Redis --configuration Release
 
       - name: Test
         run: dotnet test clients/dotnet/FeatureFlags.Client.Tests --configuration Release
+
+      # The Redis add-on's tests start a real Redis via Testcontainers, which needs the Docker
+      # daemon ubuntu-latest already ships — nothing extra to provision here.
+      - name: Test the Redis cache add-on
+        run: dotnet test clients/dotnet/FeatureFlags.Client.Redis.Tests --configuration Release
 
   node:
     runs-on: ubuntu-latest
