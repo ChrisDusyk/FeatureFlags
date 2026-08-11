@@ -38,7 +38,9 @@ COPY global.json nuget.config ./
 COPY FeatureFlags.Domain/FeatureFlags.Domain.csproj FeatureFlags.Domain/
 COPY FeatureFlags.Infrastructure/FeatureFlags.Infrastructure.csproj FeatureFlags.Infrastructure/
 COPY FeatureFlags.Server/FeatureFlags.Server.csproj FeatureFlags.Server/
-COPY Directory.Build.props ./
+# Both, and both before restore. The csproj files above name their packages without versions —
+# Directory.Packages.props is where the versions are, so restore fails outright without it.
+COPY Directory.Build.props Directory.Packages.props ./
 RUN dotnet restore FeatureFlags.Server/FeatureFlags.Server.csproj -a "$TARGETARCH"
 
 COPY FeatureFlags.Domain/ FeatureFlags.Domain/

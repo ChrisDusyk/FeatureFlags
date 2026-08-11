@@ -1,6 +1,15 @@
 <Project>
 
   <!--
+    Makes the code style rules in .editorconfig show up in `dotnet build` and in CI, not only in
+    an IDE with the solution open. They are all warnings by design — this reports, it does not
+    gate. See the header of .editorconfig for why.
+  -->
+  <PropertyGroup Condition="'$(MSBuildProjectExtension)' == '.csproj'">
+    <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
+  </PropertyGroup>
+
+  <!--
     One version for the whole platform, taken from the git tag.
 
     The server image, the auth image, and the Helm chart are released together from a `v1.2.0`
@@ -18,7 +27,7 @@
   </PropertyGroup>
 
   <ItemGroup Condition="'$(MSBuildProjectExtension)' == '.csproj'">
-    <PackageReference Include="MinVer" Version="7.0.0" PrivateAssets="all" />
+    <PackageReference Include="MinVer" PrivateAssets="all" />
   </ItemGroup>
 
 </Project>

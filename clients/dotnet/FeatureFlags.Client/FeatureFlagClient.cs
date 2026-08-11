@@ -23,30 +23,19 @@ namespace FeatureFlags.Client;
 /// there is no host to run a background service at all.
 /// </para>
 /// </summary>
-internal sealed class FeatureFlagClient : IFeatureFlagClient, IDisposable
+internal sealed class FeatureFlagClient(
+    EvaluationApiClient api,
+    IOptions<FeatureFlagsOptions> options,
+    ILogger<FeatureFlagClient> logger,
+    TimeProvider timeProvider) : IFeatureFlagClient, IDisposable
 {
-    private readonly EvaluationApiClient _api;
-    private readonly FeatureFlagsOptions _options;
-    private readonly ILogger<FeatureFlagClient> _logger;
-    private readonly TimeProvider _timeProvider;
+    private readonly FeatureFlagsOptions _options = options.Value;
 
     // One refresh at a time. Twenty threads finding the snapshot stale at once should produce one
     // request, and the nineteen that lost should use what the winner fetched.
-    private readonly SemaphoreSlim _refreshing = new SemaphoreSlim(1, 1);
+    private readonly SemaphoreSlim _refreshing = new(1, 1);
 
     private volatile FlagSnapshot? _snapshot;
-
-    public FeatureFlagClient(
-        EvaluationApiClient api,
-        IOptions<FeatureFlagsOptions> options,
-        ILogger<FeatureFlagClient> logger,
-        TimeProvider timeProvider)
-    {
-        _api = api;
-        _options = options.Value;
-        _logger = logger;
-        _timeProvider = timeProvider;
-    }
 
     public Task<bool> IsEnabledAsync(string key, CancellationToken cancellationToken = default) =>
         IsEnabledAsync(key, defaultValue: false, cancellationToken);
@@ -85,7 +74,7 @@ internal sealed class FeatureFlagClient : IFeatureFlagClient, IDisposable
     {
         var snapshot = _snapshot;
 
-        if (snapshot is not null && _timeProvider.GetUtcNow() - snapshot.FetchedAt < _options.PollingInterval)
+        if (snapshot is not null && timeProvider.GetUtcNow() - snapshot.FetchedAt < _options.PollingInterval)
         {
             return snapshot;
         }
@@ -114,12 +103,12 @@ internal sealed class FeatureFlagClient : IFeatureFlagClient, IDisposable
             }
 
             var current = _snapshot;
-            var fetched = await _api.FetchAsync(current, _timeProvider.GetUtcNow(), linked.Token)
+            var fetched = await api.FetchAsync(current, timeProvider.GetUtcNow(), linked.Token)
                 .ConfigureAwait(false);
 
             // Null is a 304: the answer is unchanged, so only its age moves. Without re-stamping,
             // an unchanged snapshot would look stale forever and be refetched on every read.
-            _snapshot = fetched ?? current?.RefreshedAt(_timeProvider.GetUtcNow());
+            _snapshot = fetched ?? current?.RefreshedAt(timeProvider.GetUtcNow());
         }
         // The caller asked to stop. That is not a failure to absorb — it is the caller's own
         // instruction, and swallowing it would leave them waiting on a token they already cancelled.
@@ -133,7 +122,7 @@ internal sealed class FeatureFlagClient : IFeatureFlagClient, IDisposable
         // answers must fall back like any other unreachable one rather than throw at a reader.
         catch (Exception exception) when (!throwOnFailure)
         {
-            _logger.LogWarning(
+            logger.LogWarning(
                 exception,
                 "Could not refresh feature flags. Continuing with the flags last read{Age}.",
                 _snapshot is null ? " — none yet, so callers get their defaults" : string.Empty);
