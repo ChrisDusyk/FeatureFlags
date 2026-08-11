@@ -17,6 +17,19 @@ frontend/                        React + Vite
 
 Dependency direction is one-way: `Domain` → (nothing) ← `Infrastructure` ← `Server`. Nothing references `Server`.
 
+## C# conventions
+
+`.editorconfig` holds them, and `EnforceCodeStyleInBuild` puts them in `dotnet build` and CI rather than only in an IDE. **Every style rule is a warning, never an error** — a build that fails over a `var` is a build people route around. Read that file before arguing with a warning; the non-obvious rules explain themselves there.
+
+- **Take dependencies through a primary constructor.** Use the parameter directly rather than copying it into a `_field`. Keep a field only when the constructor does real work — `FeatureFlagsRefreshService` keeps `_options` because `IOptions<T>.Value` is a read, not a passthrough.
+- **Two groups deliberately do not use one, and IDE0290 does not fire on either.** The EF-materialized entities (`FeatureFlag`, `User`, `SdkKey`, `FlagState`) have a second parameterless constructor for EF; a primary constructor would force it to chain through `: this(default, null!, …)`, which is worse than what it replaces. The value objects (`EnvironmentKey`, `FlagKey`, `UserRole`, `SdkKeyKind`, `SdkKeyToken`) **cannot** have one: a primary constructor is at least as accessible as its type, so converting one would let a caller mint an instance without going through `Create`/`FromPersisted`. That is a correctness rule, not a style preference.
+- **Brace style is intentionally not enforced.** `Domain` writes braceless guard clauses (`if (…) return Result.Failure(…);`); `Server` and the clients brace everything. Both stay.
+- Suppress a rule at the site with a comment saying why, rather than weakening it repository-wide. `Result<TValue>` is the one example: IDE0032 wants an auto property, but `Value`'s getter refuses on a failed result, so the field and the property are not the same thing.
+
+**Package versions live in `Directory.Packages.props`, not in any csproj.** A csproj names the package; the root file gives it a version. Two clocks run there — the platform's 10.x and the .NET client's 8.0.x floors, which are what a netstandard2.0 consumer's application gets pulled up to. Do not tidy the client's up to match; that is a breaking change for the .NET Framework, Mono, and Unity consumers the target exists for.
+
+Adding a root `Directory.*.props` file means adding it to `FeatureFlags.Server/Dockerfile` too — restore runs inside the image against copied csproj files, and a missing versions file fails there while the solution build stays green.
+
 ## Vertical slices
 
 Each feature lives in `FeatureFlags.Server/Features/{Aggregate}/{Slice}/`, fully self-contained:
