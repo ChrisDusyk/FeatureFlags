@@ -1,4 +1,5 @@
 import { SecretKeyInBrowserError } from './errors.js';
+import { readFromStore, writeToStore } from './internal/cache-store.js';
 import { fetchEvaluation, type FlagSnapshot } from './internal/evaluation.js';
 import { deadline, isBrowser, unref } from './internal/runtime.js';
 import { resolveOptions, SECRET_KEY_PREFIX, type FeatureFlagsOptions } from './options.js';
@@ -55,15 +56,40 @@ export function createFeatureFlagsClient(options: FeatureFlagsOptions): FeatureF
   // alive or land after the caller has finished with the client.
   const lifetime = new AbortController();
 
+  const cacheKey = `${resolved.cacheKeyPrefix}evaluation`;
+
   async function load(): Promise<void> {
     const attempt = deadline(lifetime.signal, resolved.timeout);
 
     try {
+      // A cold process has nothing yet — this is the one case a store actually changes behavior
+      // for. If what it holds is still within the polling interval, it is trusted outright and the
+      // origin is not asked at all; a process that starts already knowing its flags is the entire
+      // point of adding a store. If it is older than that, it is still handed to fetchEvaluation
+      // below as the conditional-request baseline, so an unchanged answer still costs only a 304.
+      if (snapshot === null && resolved.cache) {
+        const cached = await readFromStore(resolved.cache, cacheKey);
+
+        if (cached && Date.now() - cached.fetchedAt < resolved.pollingInterval) {
+          snapshot = cached;
+
+          return;
+        }
+
+        snapshot = cached;
+      }
+
       const fetched = await fetchEvaluation(resolved, snapshot, attempt);
 
       // Null is a 304: the answer is unchanged, so only its age moves. Without re-stamping, an
       // unchanged snapshot would look stale forever and be refetched on every read.
       snapshot = fetched ?? (snapshot ? { ...snapshot, fetchedAt: Date.now() } : null);
+
+      // Only on a real change, not a 304 — the store already holds the right value in that case,
+      // and FeatureFlagsCacheStore has no cheaper "just touch the TTL" operation than a full write.
+      if (fetched && resolved.cache) {
+        await writeToStore(resolved.cache, cacheKey, fetched, resolved.cacheTtlSeconds);
+      }
     } finally {
       attempt.settle();
     }
