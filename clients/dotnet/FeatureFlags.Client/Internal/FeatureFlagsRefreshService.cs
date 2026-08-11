@@ -17,25 +17,16 @@ namespace FeatureFlags.Client.Internal;
 /// arriving in an application that is idle rather than only in one under load.
 /// </para>
 /// </summary>
-internal sealed class FeatureFlagsRefreshService : BackgroundService
+internal sealed class FeatureFlagsRefreshService(
+    // The interface, and only the interface. A consumer is allowed to register their own
+    // implementation — a stub in a test, a decorator that records what was asked — and this
+    // used to cast to the concrete client, which turned that into an InvalidCastException
+    // while the host was starting. Whatever is registered is what gets refreshed.
+    IFeatureFlagClient client,
+    IOptions<FeatureFlagsOptions> options,
+    ILogger<FeatureFlagsRefreshService> logger) : BackgroundService
 {
-    private readonly IFeatureFlagClient _client;
-    private readonly FeatureFlagsOptions _options;
-    private readonly ILogger<FeatureFlagsRefreshService> _logger;
-
-    public FeatureFlagsRefreshService(
-        IFeatureFlagClient client,
-        IOptions<FeatureFlagsOptions> options,
-        ILogger<FeatureFlagsRefreshService> logger)
-    {
-        // The interface, and only the interface. A consumer is allowed to register their own
-        // implementation — a stub in a test, a decorator that records what was asked — and this
-        // used to cast to the concrete client, which turned that into an InvalidCastException
-        // while the host was starting. Whatever is registered is what gets refreshed.
-        _client = client;
-        _options = options.Value;
-        _logger = logger;
-    }
+    private readonly FeatureFlagsOptions _options = options.Value;
 
     /// <summary>
     /// The first fetch is awaited before the loop so that <c>ThrowOnStartupFailure</c> can mean
@@ -76,7 +67,7 @@ internal sealed class FeatureFlagsRefreshService : BackgroundService
     {
         try
         {
-            await _client.RefreshAsync(cancellationToken).ConfigureAwait(false);
+            await client.RefreshAsync(cancellationToken).ConfigureAwait(false);
         }
         catch (OperationCanceledException)
         {
@@ -84,7 +75,7 @@ internal sealed class FeatureFlagsRefreshService : BackgroundService
         }
         catch (Exception exception) when (!rethrow)
         {
-            _logger.LogWarning(
+            logger.LogWarning(
                 exception,
                 "Could not refresh feature flags. Callers continue with the flags last read.");
         }
@@ -92,7 +83,7 @@ internal sealed class FeatureFlagsRefreshService : BackgroundService
 
     public override async Task StopAsync(CancellationToken cancellationToken)
     {
-        _logger.LogDebug("Stopping feature flag refresh.");
+        logger.LogDebug("Stopping feature flag refresh.");
 
         await base.StopAsync(cancellationToken).ConfigureAwait(false);
     }

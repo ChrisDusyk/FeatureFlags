@@ -12,31 +12,23 @@ namespace FeatureFlags.Client.Internal;
 /// That is also what lets reads take no lock at all.
 /// </para>
 /// </summary>
-internal sealed class FlagSnapshot
+internal sealed class FlagSnapshot(
+    string environment,
+    IReadOnlyDictionary<string, bool> flags,
+    string? etag,
+    DateTimeOffset fetchedAt)
 {
-    public FlagSnapshot(
-        string environment,
-        IReadOnlyDictionary<string, bool> flags,
-        string? etag,
-        DateTimeOffset fetchedAt)
-    {
-        Environment = environment;
-        Flags = flags;
-        ETag = etag;
-        FetchedAt = fetchedAt;
-    }
-
     /// <summary>The environment the SDK key is scoped to, as the server reported it.</summary>
-    public string Environment { get; }
+    public string Environment { get; } = environment;
 
-    public IReadOnlyDictionary<string, bool> Flags { get; }
+    public IReadOnlyDictionary<string, bool> Flags { get; } = flags;
 
     /// <summary>What to send as <c>If-None-Match</c> next time, so an unchanged poll costs a 304.</summary>
-    public string? ETag { get; }
+    public string? ETag { get; } = etag;
 
-    public DateTimeOffset FetchedAt { get; }
+    public DateTimeOffset FetchedAt { get; } = fetchedAt;
 
     /// <summary>The same answer, re-stamped. What a 304 produces.</summary>
-    public FlagSnapshot RefreshedAt(DateTimeOffset fetchedAt) =>
-        new FlagSnapshot(Environment, Flags, ETag, fetchedAt);
+    public FlagSnapshot RefreshedAt(DateTimeOffset timestamp) =>
+        new(Environment, Flags, ETag, timestamp);
 }

@@ -11,7 +11,7 @@ namespace FeatureFlags.Client.Internal;
 /// <summary>
 /// The one request this package makes: <c>GET /api/evaluation</c>, conditionally.
 /// </summary>
-internal sealed class EvaluationApiClient
+internal sealed class EvaluationApiClient(HttpClient http)
 {
     /// <summary>
     /// Relative, so it composes with whatever path the installation is served under. No leading
@@ -19,14 +19,10 @@ internal sealed class EvaluationApiClient
     /// </summary>
     private const string Path = "api/evaluation";
 
-    private static readonly JsonSerializerOptions SerializerOptions = new JsonSerializerOptions
+    private static readonly JsonSerializerOptions SerializerOptions = new()
     {
         PropertyNameCaseInsensitive = true
     };
-
-    private readonly HttpClient _http;
-
-    public EvaluationApiClient(HttpClient http) => _http = http;
 
     /// <summary>
     /// Fetches, sending the previous ETag if there is one. Returns null when the server answers 304
@@ -47,7 +43,7 @@ internal sealed class EvaluationApiClient
             request.Headers.TryAddWithoutValidation("If-None-Match", etag);
         }
 
-        using var response = await _http.SendAsync(request, cancellationToken).ConfigureAwait(false);
+        using var response = await http.SendAsync(request, cancellationToken).ConfigureAwait(false);
 
         if (response.StatusCode == HttpStatusCode.NotModified && current is not null)
         {
