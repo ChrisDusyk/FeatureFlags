@@ -25,7 +25,12 @@ public class Result
 
 public class Result<TValue> : Result
 {
+    // Not an auto property, whatever IDE0032 thinks. Value's getter refuses on a failed result
+    // rather than handing back a default — the field is the storage, and the property is the
+    // guard standing in front of it. Collapsing the two would remove the guard.
+#pragma warning disable IDE0032
     private readonly TValue? _value;
+#pragma warning restore IDE0032
 
     protected internal Result(TValue? value, bool isSuccess, Error error) : base(isSuccess, error)
     {

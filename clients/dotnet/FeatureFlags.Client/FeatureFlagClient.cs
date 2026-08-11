@@ -33,7 +33,7 @@ internal sealed class FeatureFlagClient(
 
     // One refresh at a time. Twenty threads finding the snapshot stale at once should produce one
     // request, and the nineteen that lost should use what the winner fetched.
-    private readonly SemaphoreSlim _refreshing = new SemaphoreSlim(1, 1);
+    private readonly SemaphoreSlim _refreshing = new(1, 1);
 
     private volatile FlagSnapshot? _snapshot;
 

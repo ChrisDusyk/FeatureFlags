@@ -1,0 +1,241 @@
+root = true
+
+# ---------------------------------------------------------------------------
+# What this file is for.
+#
+# The conventions below were already how this repository was written — primary
+# constructors, file-scoped namespaces, collection expressions, Option instead
+# of null. They lived in CLAUDE.md and in the habit of whoever touched a file
+# last, which is fine right up until it isn't. Writing them down here means the
+# IDE and the build say so, once, rather than a reviewer saying so every time.
+#
+# Style rules are warnings, never errors. A build that fails over a `var` is a
+# build that gets `--no-restore`d around, and the point is to inform, not to
+# block. Correctness analyzers are a separate question and are not configured
+# here.
+# ---------------------------------------------------------------------------
+
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+indent_style = space
+indent_size = 2
+
+[*.{cs,csx}]
+indent_size = 4
+
+[*.{csproj,props,targets,xml}]
+indent_size = 2
+
+[*.{json,yml,yaml}]
+indent_size = 2
+
+[*.md]
+# Two trailing spaces are a hard line break in Markdown. Stripping them edits
+# the prose.
+trim_trailing_whitespace = false
+
+# ---------------------------------------------------------------------------
+# C#
+# ---------------------------------------------------------------------------
+
+[*.cs]
+
+#### Namespaces and usings ####
+
+# Every file in the repository already declares its namespace this way.
+csharp_style_namespace_declarations = file_scoped:warning
+
+csharp_using_directive_placement = outside_namespace:warning
+dotnet_sort_system_directives_first = true
+dotnet_separate_import_directive_groups = false
+
+#### Constructors ####
+
+# The convention this file was added alongside. Note that it does not fire on a
+# type with a second constructor, which is why the EF-materialized entities in
+# FeatureFlags.Domain keep their explicit pair — a primary constructor there
+# would force the parameterless EF constructor to chain through
+# `: this(default, null!, …)`, which is worse than what it replaces.
+#
+# It also cannot apply to the value objects (EnvironmentKey, FlagKey, UserRole,
+# SdkKeyKind, SdkKeyToken): a primary constructor is always at least as
+# accessible as its type, so converting one would make minting an instance
+# possible without going through Create/FromPersisted.
+csharp_style_prefer_primary_constructors = true:warning
+
+#### Modern syntax the codebase already uses ####
+
+csharp_style_implicit_object_creation_when_type_is_apparent = true:warning
+dotnet_style_object_initializer = true:warning
+dotnet_style_collection_initializer = true:warning
+dotnet_style_prefer_collection_expression = when_types_loosely_match:warning
+csharp_style_prefer_range_operator = true:warning
+csharp_style_prefer_index_operator = true:warning
+csharp_style_prefer_switch_expression = true:warning
+csharp_style_prefer_pattern_matching = true:warning
+csharp_style_prefer_not_pattern = true:warning
+csharp_style_inlined_variable_declaration = true:warning
+csharp_prefer_simple_default_expression = true:warning
+dotnet_style_prefer_auto_properties = true:warning
+dotnet_style_prefer_conditional_expression_over_assignment = true:suggestion
+dotnet_style_prefer_conditional_expression_over_return = true:suggestion
+dotnet_style_null_propagation = true:warning
+dotnet_style_coalesce_expression = true:warning
+
+#### Expression-bodied members ####
+
+# A one-line member reads better as an expression, and most of this codebase's
+# handlers, factories, and mapping methods are one line. Multi-line bodies are
+# left alone rather than being contorted into an expression.
+csharp_style_expression_bodied_methods = when_on_single_line:suggestion
+csharp_style_expression_bodied_constructors = when_on_single_line:suggestion
+csharp_style_expression_bodied_properties = when_on_single_line:suggestion
+csharp_style_expression_bodied_indexers = when_on_single_line:suggestion
+csharp_style_expression_bodied_accessors = when_on_single_line:suggestion
+csharp_style_expression_bodied_lambdas = when_on_single_line:suggestion
+csharp_style_expression_bodied_local_functions = when_on_single_line:suggestion
+
+#### var ####
+
+# Left as a suggestion on purpose. `var` is the norm here where the type is
+# already on the line, but the codebase is not uniform about it and churning
+# every declaration to prove a point is not worth a diff.
+csharp_style_var_when_type_is_apparent = true:suggestion
+csharp_style_var_for_built_in_types = false:silent
+csharp_style_var_elsewhere = false:silent
+
+#### Braces ####
+
+# Deliberately silent. FeatureFlags.Domain writes its guard clauses without
+# braces — `if (…) return Result.Failure(…);` — and the Server and client
+# projects always brace. Both readings are defensible and normalizing would be
+# a large diff of pure noise, so neither is enforced.
+csharp_prefer_braces = true:silent
+
+#### Readonly and scope ####
+
+dotnet_style_readonly_field = true:warning
+csharp_prefer_static_local_function = true:warning
+csharp_style_prefer_readonly_struct = true:warning
+csharp_style_prefer_readonly_struct_member = true:warning
+dotnet_style_require_accessibility_modifiers = for_non_interface_members:warning
+
+#### this. ####
+
+dotnet_style_qualification_for_field = false:warning
+dotnet_style_qualification_for_property = false:warning
+dotnet_style_qualification_for_method = false:warning
+dotnet_style_qualification_for_event = false:warning
+
+#### Predefined types ####
+
+dotnet_style_predefined_type_for_locals_parameters_members = true:warning
+dotnet_style_predefined_type_for_member_access = true:warning
+
+#### Unused code ####
+
+dotnet_code_quality_unused_parameters = all:suggestion
+csharp_style_unused_value_expression_statement_preference = discard_variable:silent
+csharp_style_unused_value_assignment_preference = discard_variable:suggestion
+
+#### Formatting ####
+
+csharp_new_line_before_open_brace = all
+csharp_new_line_before_else = true
+csharp_new_line_before_catch = true
+csharp_new_line_before_finally = true
+csharp_new_line_before_members_in_object_initializers = true
+csharp_new_line_before_members_in_anonymous_types = true
+csharp_new_line_between_query_expression_clauses = true
+
+csharp_indent_case_contents = true
+csharp_indent_switch_labels = true
+csharp_indent_labels = one_less_than_current
+csharp_indent_block_contents = true
+csharp_indent_braces = false
+csharp_indent_case_contents_when_block = false
+
+csharp_space_after_cast = false
+csharp_space_after_keywords_in_control_flow_statements = true
+csharp_space_between_method_declaration_parameter_list_parentheses = false
+csharp_space_between_method_call_parameter_list_parentheses = false
+csharp_space_between_parentheses = false
+csharp_space_before_colon_in_inheritance_clause = true
+csharp_space_after_colon_in_inheritance_clause = true
+csharp_space_around_binary_operators = before_and_after
+csharp_space_between_method_declaration_empty_parameter_list_parentheses = false
+csharp_space_between_method_call_name_and_opening_parenthesis = false
+csharp_space_between_method_call_empty_parameter_list_parentheses = false
+
+csharp_preserve_single_line_statements = false
+csharp_preserve_single_line_blocks = true
+
+#### Naming ####
+
+dotnet_naming_style.pascal_case.capitalization = pascal_case
+
+dotnet_naming_style.camel_case.capitalization = camel_case
+
+dotnet_naming_style.underscore_camel_case.capitalization = camel_case
+dotnet_naming_style.underscore_camel_case.required_prefix = _
+
+dotnet_naming_style.interface_prefix.capitalization = pascal_case
+dotnet_naming_style.interface_prefix.required_prefix = I
+
+dotnet_naming_style.type_parameter_prefix.capitalization = pascal_case
+dotnet_naming_style.type_parameter_prefix.required_prefix = T
+
+# Interfaces are IFeatureFlagRepository, ISdkKeyRepository, IUserRepository.
+dotnet_naming_symbols.interfaces.applicable_kinds = interface
+dotnet_naming_symbols.interfaces.applicable_accessibilities = *
+dotnet_naming_rule.interfaces_are_prefixed.symbols = interfaces
+dotnet_naming_rule.interfaces_are_prefixed.style = interface_prefix
+dotnet_naming_rule.interfaces_are_prefixed.severity = warning
+
+# TValue, TResult — the Result and Option primitives set this one.
+dotnet_naming_symbols.type_parameters.applicable_kinds = type_parameter
+dotnet_naming_symbols.type_parameters.applicable_accessibilities = *
+dotnet_naming_rule.type_parameters_are_prefixed.symbols = type_parameters
+dotnet_naming_rule.type_parameters_are_prefixed.style = type_parameter_prefix
+dotnet_naming_rule.type_parameters_are_prefixed.severity = warning
+
+# Private instance fields are _lastUsedAt, _states, _committed.
+dotnet_naming_symbols.private_fields.applicable_kinds = field
+dotnet_naming_symbols.private_fields.applicable_accessibilities = private
+dotnet_naming_rule.private_fields_are_underscored.symbols = private_fields
+dotnet_naming_rule.private_fields_are_underscored.style = underscore_camel_case
+dotnet_naming_rule.private_fields_are_underscored.severity = warning
+
+# Constants and statics stay PascalCase: MaxNameLength, SerializerOptions,
+# LastUsedResolution.
+dotnet_naming_symbols.constants_and_statics.applicable_kinds = field
+dotnet_naming_symbols.constants_and_statics.applicable_accessibilities = *
+dotnet_naming_symbols.constants_and_statics.required_modifiers = const, static
+dotnet_naming_rule.constants_and_statics_are_pascal_case.symbols = constants_and_statics
+dotnet_naming_rule.constants_and_statics_are_pascal_case.style = pascal_case
+dotnet_naming_rule.constants_and_statics_are_pascal_case.severity = warning
+
+dotnet_naming_symbols.public_members.applicable_kinds = property, method, event, namespace, class, struct, enum, delegate
+dotnet_naming_symbols.public_members.applicable_accessibilities = *
+dotnet_naming_rule.members_are_pascal_case.symbols = public_members
+dotnet_naming_rule.members_are_pascal_case.style = pascal_case
+dotnet_naming_rule.members_are_pascal_case.severity = warning
+
+dotnet_naming_symbols.parameters_and_locals.applicable_kinds = parameter, local
+dotnet_naming_rule.parameters_are_camel_case.symbols = parameters_and_locals
+dotnet_naming_rule.parameters_are_camel_case.style = camel_case
+dotnet_naming_rule.parameters_are_camel_case.severity = warning
+
+# ---------------------------------------------------------------------------
+# Generated code
+#
+# EF Core writes migrations and the model snapshot. They are output, and no
+# style rule should have an opinion about them.
+# ---------------------------------------------------------------------------
+
+[FeatureFlags.Infrastructure/Persistence/Migrations/*.cs]
+generated_code = true
+dotnet_analyzer_diagnostic.severity = none

@@ -39,7 +39,7 @@ public class FeatureFlagTests
         Assert.Equal(EnvironmentKey.All.Count, flag.States.Count);
         Assert.Equal(
             EnvironmentKey.All,
-            flag.States.Select(state => state.Environment).ToList());
+            [.. flag.States.Select(state => state.Environment)]);
     }
 
     [Fact]
