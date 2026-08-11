@@ -73,6 +73,15 @@ blind is worse for you than not starting, and call `RefreshAsync` when you want 
 | `Timeout` | 10s | How long one refresh may take. |
 | `ThrowOnStartupFailure` | `false` | Whether an unreadable first snapshot stops the host. |
 
+## Surviving a longer outage, or sharing one snapshot across instances
+
+The in-memory snapshot above is lost on restart, and each instance of your application polls the
+FeatureFlags server independently. If you want a freshly started instance to answer correctly from
+the moment it starts, or want an outage survived for longer than one process happens to stay up,
+add [`FeatureFlags.Client.Redis`](https://www.nuget.org/packages/FeatureFlags.Client.Redis) — an
+optional tier backed by Redis your own application already runs. Nothing above changes if you don't
+add it; this package's behavior is unaffected either way.
+
 ## Versioning
 
 This package versions independently of the platform. Its compatibility surface is
