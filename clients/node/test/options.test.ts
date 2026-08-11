@@ -60,6 +60,23 @@ describe('options', () => {
     expect(() => build({ timeout: Number.NaN })).toThrow(/timeout/);
   });
 
+  it('rejects a non-positive cacheTtlSeconds', () => {
+    expect(() => build({ cacheTtlSeconds: 0 })).toThrow(/cacheTtlSeconds/);
+    expect(() => build({ cacheTtlSeconds: -1 })).toThrow(/cacheTtlSeconds/);
+  });
+
+  it('rejects a cache that does not implement get and set', () => {
+    expect(() => build({ cache: {} })).toThrow(/FeatureFlagsCacheStore/);
+    expect(() => build({ cache: { get: async () => null } })).toThrow(/FeatureFlagsCacheStore/);
+  });
+
+  it('is unaffected by cache options when none are given, same as before this existed', () => {
+    const flags = build({});
+
+    expect(flags).toBeDefined();
+    flags.close();
+  });
+
   it('rejects a missing options object', () => {
     expect(() => createFeatureFlagsClient(undefined as never)).toThrow(/options object/);
   });
