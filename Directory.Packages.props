@@ -84,6 +84,20 @@
   </ItemGroup>
 
   <!--
+    The optional Redis cache add-on (FeatureFlags.Client.Redis). Also netstandard2.0, for the same
+    consumers as the base client above — but these are not in-box-replacement BCL packages with a
+    reason to stay pinned to an old floor the way the group above is. FusionCache and the Redis
+    packages are third-party libraries with their own release cadence, so they move on that cadence
+    rather than being held down to what a Framework/Unity runtime already ships.
+  -->
+  <ItemGroup>
+    <PackageVersion Include="Microsoft.Extensions.Caching.StackExchangeRedis" Version="10.0.11" />
+    <PackageVersion Include="ZiggyCreatures.FusionCache" Version="2.6.0" />
+    <PackageVersion Include="ZiggyCreatures.FusionCache.Backplane.StackExchangeRedis" Version="2.6.0" />
+    <PackageVersion Include="ZiggyCreatures.FusionCache.Serialization.SystemTextJson" Version="2.6.0" />
+  </ItemGroup>
+
+  <!--
     Testing. The client's tests target net10.0 and are not bound by the netstandard2.0 floor above
     — they exercise the package, they are not shipped with it.
   -->
@@ -92,6 +106,8 @@
     <PackageVersion Include="Microsoft.Extensions.Hosting" Version="10.0.0" />
     <PackageVersion Include="Microsoft.Extensions.TimeProvider.Testing" Version="10.8.0" />
     <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="17.14.1" />
+    <PackageVersion Include="StackExchange.Redis" Version="3.1.13" />
+    <PackageVersion Include="Testcontainers.Redis" Version="4.13.0" />
     <PackageVersion Include="xunit.runner.visualstudio" Version="3.1.5" />
     <PackageVersion Include="xunit.v3" Version="3.2.2" />
   </ItemGroup>

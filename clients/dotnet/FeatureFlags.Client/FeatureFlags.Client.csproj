@@ -52,10 +52,21 @@
     The public surface is deliberately three methods, and most of what is worth testing sits behind
     it: the snapshot, the conditional request, the fallback when the server cannot be reached.
     Reaching those would otherwise mean widening the API for the tests' benefit.
+
+    FeatureFlags.Client.Redis gets the same access, for the same reason rather than a new one: its
+    factory needs EvaluationApiClient's conditional GET and FlagSnapshot directly, so that adding a
+    Redis tier in front is a cache in front of the existing fetch rather than a second, divergent
+    implementation of it.
   -->
   <ItemGroup>
     <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleTo">
       <_Parameter1>FeatureFlags.Client.Tests</_Parameter1>
+    </AssemblyAttribute>
+    <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleTo">
+      <_Parameter1>FeatureFlags.Client.Redis</_Parameter1>
+    </AssemblyAttribute>
+    <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleTo">
+      <_Parameter1>FeatureFlags.Client.Redis.Tests</_Parameter1>
     </AssemblyAttribute>
   </ItemGroup>
 
