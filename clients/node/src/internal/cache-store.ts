@@ -1,5 +1,30 @@
 import type { FeatureFlagsCacheStore } from '../cache.js';
+import type { ResolvedOptions } from '../options.js';
 import type { FlagSnapshot } from './evaluation.js';
+
+/**
+ * `${cacheKeyPrefix}${host}:${environment}:evaluation` — host and environment, not just the
+ * prefix, so two environments (or two installations) sharing one store don't overwrite each
+ * other's snapshot under the same key.
+ *
+ * The environment segment comes from the SDK key itself (`ffs_{env}_{selector}_{secret}`), known
+ * synchronously at client construction — before the first fetch has told us the environment the
+ * server actually reports, which is what a cache key derived any other way would have to wait for.
+ * This is namespacing only, never trusted for anything the server itself decides: an unexpected
+ * segment just means a cache miss, not a wrong answer.
+ */
+export function buildCacheKey(resolved: ResolvedOptions): string {
+  const host = new URL(resolved.baseAddress).host;
+  const environment = parseEnvironment(resolved.sdkKey);
+
+  return `${resolved.cacheKeyPrefix}${host}:${environment}:evaluation`;
+}
+
+function parseEnvironment(sdkKey: string): string {
+  const segments = sdkKey.split('_');
+
+  return segments.length > 1 && segments[1] ? segments[1] : 'unknown';
+}
 
 /** The JSON shape written to a `FeatureFlagsCacheStore` — `FlagSnapshot` with its `Map` flattened
  * to a plain object, since `Map` does not survive `JSON.stringify` on its own. */

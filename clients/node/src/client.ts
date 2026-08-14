@@ -1,5 +1,5 @@
 import { SecretKeyInBrowserError } from './errors.js';
-import { readFromStore, writeToStore } from './internal/cache-store.js';
+import { buildCacheKey, readFromStore, writeToStore } from './internal/cache-store.js';
 import { fetchEvaluation, type FlagSnapshot } from './internal/evaluation.js';
 import { deadline, isBrowser, unref } from './internal/runtime.js';
 import { resolveOptions, SECRET_KEY_PREFIX, type FeatureFlagsOptions } from './options.js';
@@ -56,7 +56,14 @@ export function createFeatureFlagsClient(options: FeatureFlagsOptions): FeatureF
   // alive or land after the caller has finished with the client.
   const lifetime = new AbortController();
 
-  const cacheKey = `${resolved.cacheKeyPrefix}evaluation`;
+  const cacheKey = buildCacheKey(resolved);
+
+  // When the store was last written to. A 304 doesn't change what's there, so it doesn't need a
+  // fresh write every poll — but it does need one occasionally, or a store whose ttlSeconds is
+  // shorter than "how long this process goes between real changes" would expire a perfectly
+  // current entry, and a restart during that gap would find nothing. Rewriting at half the TTL
+  // keeps it always at most half-expired without writing on every single poll.
+  let cacheWrittenAt = 0;
 
   async function load(): Promise<void> {
     const attempt = deadline(lifetime.signal, resolved.timeout);
@@ -85,10 +92,13 @@ export function createFeatureFlagsClient(options: FeatureFlagsOptions): FeatureF
       // unchanged snapshot would look stale forever and be refetched on every read.
       snapshot = fetched ?? (snapshot ? { ...snapshot, fetchedAt: Date.now() } : null);
 
-      // Only on a real change, not a 304 — the store already holds the right value in that case,
-      // and FeatureFlagsCacheStore has no cheaper "just touch the TTL" operation than a full write.
-      if (fetched && resolved.cache) {
-        await writeToStore(resolved.cache, cacheKey, fetched, resolved.cacheTtlSeconds);
+      if (snapshot && resolved.cache) {
+        const dueForRewrite = Date.now() - cacheWrittenAt >= (resolved.cacheTtlSeconds * 1000) / 2;
+
+        if (fetched || dueForRewrite) {
+          await writeToStore(resolved.cache, cacheKey, snapshot, resolved.cacheTtlSeconds);
+          cacheWrittenAt = Date.now();
+        }
       }
     } finally {
       attempt.settle();

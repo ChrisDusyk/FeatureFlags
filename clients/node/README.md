@@ -128,6 +128,12 @@ within `pollingInterval`, that value is trusted outright with no request made at
 value is still handed to the server as the conditional-request baseline, so even a stale-but-
 unchanged entry costs only a 304, not a full refetch.
 
+**A poll that finds nothing changed still refreshes the store occasionally, not on every 304.** A
+long-lived process whose flags never change would otherwise let its own store entry lapse past
+`cacheTtlSeconds` despite polling successfully the whole time — the entry is rewritten once it's
+about half as old as `cacheTtlSeconds` allows, which keeps it from ever getting close to expiring
+under a healthy client without writing on every single poll.
+
 **A failure in your store never surfaces through `isEnabled`.** A blip in your own Redis is not the
 FeatureFlags server being unreachable, and is treated as a cache miss, not a client failure.
 
@@ -142,7 +148,7 @@ FeatureFlags server being unreachable, and is treated as a cache miss, not a cli
 | `fetch` | global | For tests, or a proxy agent. |
 | `cache` | none | A `FeatureFlagsCacheStore` backed by your own Redis (or other store). Optional. |
 | `cacheTtlSeconds` | `86400` | How long a value in `cache` survives a real outage. Only meaningful with `cache` set. |
-| `cacheKeyPrefix` | `"featureflags:"` | Prefixed onto the key this client uses in `cache`, so it cannot collide with your application's own keys. |
+| `cacheKeyPrefix` | `"featureflags:"` | Prefixed onto the key this client uses in `cache`, so it cannot collide with your application's own keys. The key already includes the installation's host and the SDK key's environment, so two environments — or two installations — sharing one store and the same `cacheKeyPrefix` still don't collide with each other. |
 
 ## Versioning
 
