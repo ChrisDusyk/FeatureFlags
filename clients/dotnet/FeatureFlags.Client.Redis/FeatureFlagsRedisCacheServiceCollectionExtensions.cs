@@ -56,6 +56,7 @@ public static class FeatureFlagsRedisCacheServiceCollectionExtensions
 
         var redisOptions = new FeatureFlagsRedisCacheOptions();
         configure(redisOptions);
+        Validate(redisOptions);
 
         services
             .AddFusionCache()
@@ -89,4 +90,37 @@ public static class FeatureFlagsRedisCacheServiceCollectionExtensions
         options.ConnectionMultiplexerFactory is { } factory
             ? factory(provider)
             : provider.GetRequiredService<IConnectionMultiplexer>();
+
+    // Options set through a plain settable POCO, not the IOptions pattern's own validation pipeline
+    // — so nothing else catches a bad value before it reaches FusionCache and surfaces as a null
+    // reference or silently wrong caching behavior instead of a clear message at startup.
+    private static void Validate(FeatureFlagsRedisCacheOptions options)
+    {
+        if (string.IsNullOrEmpty(options.KeyPrefix))
+        {
+            throw new ArgumentException("KeyPrefix must not be null or empty.", nameof(options));
+        }
+
+        if (options.FailSafeMaxDuration <= TimeSpan.Zero)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(options), options.FailSafeMaxDuration, "FailSafeMaxDuration must be positive.");
+        }
+
+        if (options.FailSafeThrottleDuration < TimeSpan.Zero)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(options),
+                options.FailSafeThrottleDuration,
+                "FailSafeThrottleDuration must not be negative.");
+        }
+
+        if (options.EagerRefreshThreshold is < 0f or > 1f)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(options),
+                options.EagerRefreshThreshold,
+                "EagerRefreshThreshold must be between 0 and 1.");
+        }
+    }
 }
