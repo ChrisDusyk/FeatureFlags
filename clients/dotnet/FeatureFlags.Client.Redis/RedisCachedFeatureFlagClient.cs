@@ -55,7 +55,12 @@ internal sealed class RedisCachedFeatureFlagClient : IFeatureFlagClient
             throw new ArgumentNullException(nameof(redisOptions));
         }
 
-        _cacheKey = redisOptions.KeyPrefix + "evaluation";
+        // Environment and host, not just KeyPrefix: two environments (or two installations) sharing
+        // one Redis would otherwise overwrite each other's snapshot under the same key. The
+        // environment segment of an SDK key is documentation, never trusted for authorization — the
+        // server's own claim decides what a key can read — but namespacing a cache key by it is a
+        // different, lower-stakes use that this is fine for.
+        _cacheKey = BuildCacheKey(redisOptions.KeyPrefix, options.Value);
 
         // Duration mirrors PollingInterval on purpose: it is the same "how stale may this get
         // before asking again" contract the base client already documents, just enforced by
@@ -162,4 +167,24 @@ internal sealed class RedisCachedFeatureFlagClient : IFeatureFlagClient
 
     private static CachedFlags ToCached(FlagSnapshot snapshot) =>
         new(snapshot.Environment, snapshot.Flags, snapshot.ETag);
+
+    private static string BuildCacheKey(string keyPrefix, FeatureFlagsOptions options)
+    {
+        var host = options.BaseAddress?.Host ?? "unknown";
+
+        return $"{keyPrefix}{host}:{ParseEnvironment(options.SdkKey)}:evaluation";
+    }
+
+    /// <summary>
+    /// The environment segment of an SDK key (<c>ffs_{env}_{selector}_{secret}</c>), used only to
+    /// namespace this cache key. "unknown" for anything that does not look like that shape — a
+    /// wrong namespace is a cache miss, not a wrong answer, so this does not need to duplicate the
+    /// base package's own key-format validation.
+    /// </summary>
+    private static string ParseEnvironment(string? sdkKey)
+    {
+        var segments = sdkKey?.Split('_');
+
+        return segments is { Length: > 1 } && segments[1].Length > 0 ? segments[1] : "unknown";
+    }
 }

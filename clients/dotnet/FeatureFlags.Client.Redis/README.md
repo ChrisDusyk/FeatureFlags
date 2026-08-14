@@ -67,7 +67,7 @@ waiting for its own `PollingInterval` to elapse.
 | `FailSafeMaxDuration` | 24h | How long a stale answer survives a real outage. |
 | `FailSafeThrottleDuration` | 30s | How often fail-safe retries the origin during a sustained outage. |
 | `EagerRefreshThreshold` | 0.5 | Fraction of `PollingInterval` after which a read triggers a background refresh instead of waiting for the entry to fully expire. |
-| `KeyPrefix` | `"featureflags:"` | Prefixed onto the Redis key, so it cannot collide with your application's own keys. |
+| `KeyPrefix` | `"featureflags:"` | Prefixed onto the Redis key, so it cannot collide with your application's own keys. The key already includes the installation's host and the SDK key's environment, so two environments — or two installations — sharing one Redis and the same `KeyPrefix` still don't collide with each other. |
 
 ## Versioning
 

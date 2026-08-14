@@ -45,14 +45,16 @@ public sealed class RedisCachedFeatureFlagClientTests(RedisFixture redis)
         StubHandler server,
         string keyPrefix,
         TimeSpan? pollingInterval = null,
-        TimeSpan? failSafeMaxDuration = null) =>
+        TimeSpan? failSafeMaxDuration = null,
+        string? sdkKey = null,
+        Uri? baseAddress = null) =>
         new(
-            new EvaluationApiClient(new HttpClient(server) { BaseAddress = new Uri("https://flags.example.com/") }),
+            new EvaluationApiClient(new HttpClient(server) { BaseAddress = baseAddress ?? new Uri("https://flags.example.com/") }),
             BuildCache(),
             Options.Create(new FeatureFlagsOptions
             {
-                BaseAddress = new Uri("https://flags.example.com"),
-                SdkKey = SdkKey,
+                BaseAddress = baseAddress ?? new Uri("https://flags.example.com"),
+                SdkKey = sdkKey ?? SdkKey,
                 PollingInterval = pollingInterval ?? TimeSpan.FromMilliseconds(200)
             }),
             new FeatureFlagsRedisCacheOptions
@@ -138,6 +140,49 @@ public sealed class RedisCachedFeatureFlagClientTests(RedisFixture redis)
 
         Assert.True(flipped);
         Assert.Equal(callsBeforeTheFlip, secondServer.CallCount);
+    }
+
+    [Fact]
+    public async Task TwoEnvironmentsSharingOneKeyPrefix_DoNotOverwriteEachOthersSnapshot()
+    {
+        var keyPrefix = RedisFixture.NewKeyPrefix();
+        const string devKey = "ffs_dev_f992c8928754087a_7f097037aa14d671f4317df877989f05f5309c1323ecb24dab4be5597f40db10";
+        const string prodKey = "ffs_prod_f992c8928754087a_7f097037aa14d671f4317df877989f05f5309c1323ecb24dab4be5597f40db10";
+
+        var dev = CreateSut(
+            new StubHandler().AnswersWithFlags("dev", new { on = true }, "\"v1\""),
+            keyPrefix,
+            sdkKey: devKey);
+        var prod = CreateSut(
+            new StubHandler().AnswersWithFlags("prod", new { on = false }, "\"v1\""),
+            keyPrefix,
+            sdkKey: prodKey);
+
+        Assert.True(await dev.IsEnabledAsync("on", Cancellation));
+        Assert.False(await prod.IsEnabledAsync("on", Cancellation));
+
+        // Reading dev again afterwards should still be true — if the two shared one Redis key,
+        // whichever answered second would have clobbered the other's entry.
+        Assert.True(await dev.IsEnabledAsync("on", Cancellation));
+    }
+
+    [Fact]
+    public async Task TwoInstallationsSharingOneKeyPrefixAndEnvironment_DoNotOverwriteEachOthersSnapshot()
+    {
+        var keyPrefix = RedisFixture.NewKeyPrefix();
+
+        var a = CreateSut(
+            new StubHandler().AnswersWithFlags("dev", new { on = true }, "\"v1\""),
+            keyPrefix,
+            baseAddress: new Uri("https://flags-a.example.com/"));
+        var b = CreateSut(
+            new StubHandler().AnswersWithFlags("dev", new { on = false }, "\"v1\""),
+            keyPrefix,
+            baseAddress: new Uri("https://flags-b.example.com/"));
+
+        Assert.True(await a.IsEnabledAsync("on", Cancellation));
+        Assert.False(await b.IsEnabledAsync("on", Cancellation));
+        Assert.True(await a.IsEnabledAsync("on", Cancellation));
     }
 
     [Fact]
