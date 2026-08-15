@@ -55,4 +55,45 @@ public sealed class ServiceCollectionWiringTests(RedisFixture redis)
         Assert.IsType<RedisCachedFeatureFlagClient>(client);
         Assert.True(await client.IsEnabledAsync("on", Cancellation));
     }
+
+    [Fact]
+    public async Task ConnectionMultiplexerFactory_IsInvokedOnce_NotOncePerFusionCacheLayer()
+    {
+        var server = new StubHandler().AnswersWithFlags("dev", new { on = true }, "\"v1\"");
+        var keyPrefix = RedisFixture.NewKeyPrefix();
+
+        var factoryCalls = 0;
+        using var multiplexer = ConnectionMultiplexer.Connect(redis.ConnectionString);
+
+        var services = new ServiceCollection();
+        services.AddLogging();
+        services.AddFeatureFlags(options =>
+        {
+            options.BaseAddress = new Uri("https://flags.example.com");
+            options.SdkKey = SdkKey;
+        });
+
+        // The shape the README shows: a factory that opens its own connection rather than reusing
+        // one already in the container. WithDistributedCache and WithBackplane each own a
+        // ConnectionMultiplexerFactory and would otherwise call this independently, opening a
+        // second Redis connection nothing here needs.
+        services.AddFeatureFlagsRedisCache(o =>
+        {
+            o.KeyPrefix = keyPrefix;
+            o.ConnectionMultiplexerFactory = _ =>
+            {
+                Interlocked.Increment(ref factoryCalls);
+                return multiplexer;
+            };
+        });
+
+        services.AddHttpClient<EvaluationApiClient>().ConfigurePrimaryHttpMessageHandler(() => server);
+
+        using var provider = services.BuildServiceProvider();
+        var client = provider.GetRequiredService<IFeatureFlagClient>();
+
+        Assert.True(await client.IsEnabledAsync("on", Cancellation));
+
+        Assert.Equal(1, factoryCalls);
+    }
 }

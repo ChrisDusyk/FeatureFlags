@@ -58,16 +58,22 @@ public static class FeatureFlagsRedisCacheServiceCollectionExtensions
         configure(redisOptions);
         Validate(redisOptions);
 
+        // One resolver instance shared by both callbacks below: WithDistributedCache and
+        // WithBackplane each own their ConnectionMultiplexerFactory and call it independently, so
+        // without memoizing, a caller-supplied ConnectionMultiplexerFactory that opens a new
+        // connection (the shape the README shows) would open two — one nothing else here needs.
+        var resolveMultiplexer = CreateMultiplexerResolver(redisOptions);
+
         services
             .AddFusionCache()
             .WithSerializer(new FusionCacheSystemTextJsonSerializer())
             .WithDistributedCache(provider => new RedisCache(new RedisCacheOptions
             {
-                ConnectionMultiplexerFactory = () => Task.FromResult(ResolveMultiplexer(provider, redisOptions))
+                ConnectionMultiplexerFactory = () => Task.FromResult(resolveMultiplexer(provider))
             }))
             .WithBackplane(provider => new RedisBackplane(new RedisBackplaneOptions
             {
-                ConnectionMultiplexerFactory = () => Task.FromResult(ResolveMultiplexer(provider, redisOptions))
+                ConnectionMultiplexerFactory = () => Task.FromResult(resolveMultiplexer(provider))
             }));
 
         // Not TryAdd: this is meant to replace the in-memory-only client AddFeatureFlags registered.
@@ -84,12 +90,22 @@ public static class FeatureFlagsRedisCacheServiceCollectionExtensions
         return services;
     }
 
-    private static IConnectionMultiplexer ResolveMultiplexer(
-        IServiceProvider provider,
-        FeatureFlagsRedisCacheOptions options) =>
-        options.ConnectionMultiplexerFactory is { } factory
-            ? factory(provider)
-            : provider.GetRequiredService<IConnectionMultiplexer>();
+    private static Func<IServiceProvider, IConnectionMultiplexer> CreateMultiplexerResolver(
+        FeatureFlagsRedisCacheOptions options)
+    {
+        var gate = new object();
+        IConnectionMultiplexer? multiplexer = null;
+
+        return provider =>
+        {
+            lock (gate)
+            {
+                return multiplexer ??= options.ConnectionMultiplexerFactory is { } factory
+                    ? factory(provider)
+                    : provider.GetRequiredService<IConnectionMultiplexer>();
+            }
+        };
+    }
 
     // Options set through a plain settable POCO, not the IOptions pattern's own validation pipeline
     // — so nothing else catches a bad value before it reaches FusionCache and surfaces as a null
