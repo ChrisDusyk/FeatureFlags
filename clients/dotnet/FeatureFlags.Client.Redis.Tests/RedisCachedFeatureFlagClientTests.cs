@@ -186,6 +186,27 @@ public sealed class RedisCachedFeatureFlagClientTests(RedisFixture redis)
     }
 
     [Fact]
+    public async Task TwoInstallationsOnTheSameHostButDifferentPorts_DoNotOverwriteEachOthersSnapshot()
+    {
+        var keyPrefix = RedisFixture.NewKeyPrefix();
+
+        // Same host, different port — the common shape for two local instances on one machine.
+        // Uri.Host alone would collide these under the same cache key.
+        var a = CreateSut(
+            new StubHandler().AnswersWithFlags("dev", new { on = true }, "\"v1\""),
+            keyPrefix,
+            baseAddress: new Uri("https://flags.example.com:5001/"));
+        var b = CreateSut(
+            new StubHandler().AnswersWithFlags("dev", new { on = false }, "\"v1\""),
+            keyPrefix,
+            baseAddress: new Uri("https://flags.example.com:5002/"));
+
+        Assert.True(await a.IsEnabledAsync("on", Cancellation));
+        Assert.False(await b.IsEnabledAsync("on", Cancellation));
+        Assert.True(await a.IsEnabledAsync("on", Cancellation));
+    }
+
+    [Fact]
     public async Task ANotModifiedResponse_ShouldKeepThePreviousAnswer()
     {
         var server = new StubHandler().AnswersWithFlags("dev", new { on = true }, "\"v1\"");

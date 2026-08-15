@@ -170,10 +170,21 @@ internal sealed class RedisCachedFeatureFlagClient : IFeatureFlagClient
 
     private static string BuildCacheKey(string keyPrefix, FeatureFlagsOptions options)
     {
-        var host = options.BaseAddress?.Host ?? "unknown";
+        var host = FormatHost(options.BaseAddress);
 
         return $"{keyPrefix}{host}:{ParseEnvironment(options.SdkKey)}:evaluation";
     }
+
+    // Uri.Host alone drops the port, which would collide two installations that differ only by
+    // port — the common shape for two local instances on the same machine. Uri.Port is included
+    // only when it isn't the scheme's default, matching what the Node client's URL.host does.
+    private static string FormatHost(Uri? baseAddress) =>
+        baseAddress switch
+        {
+            null => "unknown",
+            { IsDefaultPort: true } => baseAddress.Host,
+            _ => $"{baseAddress.Host}:{baseAddress.Port}"
+        };
 
     /// <summary>
     /// The environment segment of an SDK key (<c>ffs_{env}_{selector}_{secret}</c>), used only to
