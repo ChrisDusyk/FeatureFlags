@@ -29,10 +29,6 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "FeatureFlags.Client.Tests",
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "dotnet", "dotnet", "{71E6E750-85FD-B5BC-4321-E01377EC6231}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "FeatureFlags.Client.Redis", "clients\dotnet\FeatureFlags.Client.Redis\FeatureFlags.Client.Redis.csproj", "{83192D53-987B-4AFE-8BB9-0055D482CC7B}"
-EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "FeatureFlags.Client.Redis.Tests", "clients\dotnet\FeatureFlags.Client.Redis.Tests\FeatureFlags.Client.Redis.Tests.csproj", "{A62BC7C9-5247-47ED-A196-C28A7D2FA26A}"
-EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
