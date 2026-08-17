@@ -1,3 +1,5 @@
+import type { FeatureFlagsCacheStore } from './cache.js';
+
 /**
  * How to reach a FeatureFlags installation.
  *
@@ -38,10 +40,36 @@ export interface FeatureFlagsOptions {
    * for tests and for anyone who has to route through a proxy agent.
    */
   fetch?: typeof globalThis.fetch;
+
+  /**
+   * Where to keep the last known-good snapshot outside this process, so a fresh process — or one
+   * that just restarted — does not start from nothing while it waits for its first fetch to land.
+   * Optional, and additive: omitted, this client behaves exactly as it does today, in-memory only,
+   * lost on restart. There is no default implementation because there is no Redis client this
+   * package could import without breaking browser bundles for everyone who never touches this
+   * option — see `FeatureFlagsCacheStore`.
+   */
+  cache?: FeatureFlagsCacheStore;
+
+  /**
+   * How long a snapshot written to `cache` may still be served after a real outage, in seconds.
+   * Only meaningful with `cache` set. This is deliberately a different number from
+   * `pollingInterval`, and a much larger one — it is the backstop for an outage, not the normal
+   * freshness bound. Defaults to 86400 (24 hours).
+   */
+  cacheTtlSeconds?: number;
+
+  /**
+   * Prefixed onto the key this client uses in `cache`, so it cannot collide with unrelated keys in
+   * a store the host application also uses for its own caching, or with another environment's
+   * client sharing the same store. Defaults to `'featureflags:'`.
+   */
+  cacheKeyPrefix?: string;
 }
 
-export interface ResolvedOptions extends Required<Omit<FeatureFlagsOptions, 'fetch'>> {
+export interface ResolvedOptions extends Required<Omit<FeatureFlagsOptions, 'fetch' | 'cache'>> {
   fetch: typeof globalThis.fetch;
+  cache: FeatureFlagsCacheStore | null;
 }
 
 export const SECRET_KEY_PREFIX = 'ffs_';
@@ -50,6 +78,8 @@ export const PUBLISHABLE_KEY_PREFIX = 'ffp_';
 const DEFAULTS = {
   pollingInterval: 30_000,
   timeout: 10_000,
+  cacheTtlSeconds: 86_400,
+  cacheKeyPrefix: 'featureflags:',
 } as const;
 
 /**
@@ -78,6 +108,29 @@ export function resolveOptions(options: FeatureFlagsOptions): ResolvedOptions {
     throw new TypeError('FeatureFlags: timeout must be a positive number of milliseconds.');
   }
 
+  const cacheTtlSeconds = options.cacheTtlSeconds ?? DEFAULTS.cacheTtlSeconds;
+
+  if (!Number.isFinite(cacheTtlSeconds) || cacheTtlSeconds <= 0) {
+    throw new TypeError('FeatureFlags: cacheTtlSeconds must be a positive number of seconds.');
+  }
+
+  const cacheKeyPrefix = options.cacheKeyPrefix ?? DEFAULTS.cacheKeyPrefix;
+
+  if (typeof cacheKeyPrefix !== 'string') {
+    throw new TypeError('FeatureFlags: cacheKeyPrefix must be a string.');
+  }
+
+  const cache = options.cache ?? null;
+
+  // Checked structurally rather than trusting the type: this is the one option a caller is most
+  // likely to pass something almost-right for (an actual Redis client, not the small interface
+  // wrapping one), and failing here beats failing inside the first background refresh instead.
+  if (cache !== null && (typeof cache.get !== 'function' || typeof cache.set !== 'function')) {
+    throw new TypeError(
+      'FeatureFlags: cache must implement get(key) and set(key, value, ttlSeconds) — see FeatureFlagsCacheStore.',
+    );
+  }
+
   const resolvedFetch = options.fetch ?? globalThis.fetch;
 
   if (typeof resolvedFetch !== 'function') {
@@ -91,6 +144,9 @@ export function resolveOptions(options: FeatureFlagsOptions): ResolvedOptions {
     sdkKey,
     pollingInterval,
     timeout,
+    cacheTtlSeconds,
+    cacheKeyPrefix,
+    cache,
     // Bound, because an unbound global fetch throws "Illegal invocation" in a browser.
     fetch: resolvedFetch.bind(globalThis),
   };

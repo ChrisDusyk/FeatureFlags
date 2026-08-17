@@ -1,4 +1,5 @@
 import { SecretKeyInBrowserError } from './errors.js';
+import { buildCacheKey, readFromStore, writeToStore } from './internal/cache-store.js';
 import { fetchEvaluation, type FlagSnapshot } from './internal/evaluation.js';
 import { deadline, isBrowser, unref } from './internal/runtime.js';
 import { resolveOptions, SECRET_KEY_PREFIX, type FeatureFlagsOptions } from './options.js';
@@ -55,15 +56,50 @@ export function createFeatureFlagsClient(options: FeatureFlagsOptions): FeatureF
   // alive or land after the caller has finished with the client.
   const lifetime = new AbortController();
 
+  const cacheKey = buildCacheKey(resolved);
+
+  // When the store was last written to. A 304 doesn't change what's there, so it doesn't need a
+  // fresh write every poll — but it does need one occasionally, or a store whose ttlSeconds is
+  // shorter than "how long this process goes between real changes" would expire a perfectly
+  // current entry, and a restart during that gap would find nothing. Rewriting at half the TTL
+  // keeps it always at most half-expired without writing on every single poll.
+  let cacheWrittenAt = 0;
+
   async function load(): Promise<void> {
     const attempt = deadline(lifetime.signal, resolved.timeout);
 
     try {
+      // A cold process has nothing yet — this is the one case a store actually changes behavior
+      // for. If what it holds is still within the polling interval, it is trusted outright and the
+      // origin is not asked at all; a process that starts already knowing its flags is the entire
+      // point of adding a store. If it is older than that, it is still handed to fetchEvaluation
+      // below as the conditional-request baseline, so an unchanged answer still costs only a 304.
+      if (snapshot === null && resolved.cache) {
+        const cached = await readFromStore(resolved.cache, cacheKey);
+
+        if (cached && Date.now() - cached.fetchedAt < resolved.pollingInterval) {
+          snapshot = cached;
+
+          return;
+        }
+
+        snapshot = cached;
+      }
+
       const fetched = await fetchEvaluation(resolved, snapshot, attempt);
 
       // Null is a 304: the answer is unchanged, so only its age moves. Without re-stamping, an
       // unchanged snapshot would look stale forever and be refetched on every read.
       snapshot = fetched ?? (snapshot ? { ...snapshot, fetchedAt: Date.now() } : null);
+
+      if (snapshot && resolved.cache) {
+        const dueForRewrite = Date.now() - cacheWrittenAt >= (resolved.cacheTtlSeconds * 1000) / 2;
+
+        if (fetched || dueForRewrite) {
+          await writeToStore(resolved.cache, cacheKey, snapshot, resolved.cacheTtlSeconds);
+          cacheWrittenAt = Date.now();
+        }
+      }
     } finally {
       attempt.settle();
     }

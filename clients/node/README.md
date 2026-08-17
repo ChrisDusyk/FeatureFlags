@@ -76,6 +76,67 @@ await flags.refresh(); // rejects if the installation cannot be read
 **The timer never holds a Node process open** (`unref`), so a CLI still exits. Call `close()` to
 stop polling explicitly; the client keeps answering from its last snapshot afterwards.
 
+## Surviving a longer outage, or sharing one snapshot across instances
+
+The in-memory snapshot above is lost on restart, and every instance of your application polls the
+FeatureFlags server independently. If you'd rather a freshly started instance answer correctly from
+its very first read, or want an outage survived for longer than one process happens to stay up,
+give the client a `cache` — a small interface you implement against whatever Redis client (or other
+store) your own application already uses. Nothing above changes if you don't set one; this is
+additive, and there's no default implementation, because there's no Redis client this package could
+import without breaking a browser bundle for everyone who never touches this option.
+
+```ts
+import Redis from 'ioredis';
+import { createFeatureFlagsClient, type FeatureFlagsCacheStore } from '@featureflags/client';
+
+const redis = new Redis(process.env.REDIS_URL!);
+
+const cache: FeatureFlagsCacheStore = {
+  get: (key) => redis.get(key),
+  set: (key, value, ttlSeconds) => redis.set(key, value, 'EX', ttlSeconds).then(() => {}),
+};
+
+const flags = createFeatureFlagsClient({
+  baseAddress: 'https://flags.example.com',
+  sdkKey: process.env.FEATUREFLAGS_SDK_KEY!,
+  cache,
+});
+```
+
+Or with [`redis`](https://www.npmjs.com/package/redis):
+
+```ts
+import { createClient } from 'redis';
+
+const redis = await createClient({ url: process.env.REDIS_URL }).connect();
+
+const cache: FeatureFlagsCacheStore = {
+  get: (key) => redis.get(key),
+  set: (key, value, ttlSeconds) => redis.set(key, value, { EX: ttlSeconds }).then(() => {}),
+};
+```
+
+**Two different settings govern staleness, on purpose.** `pollingInterval` is still the normal
+freshness bound — how long an answer may go before the origin is asked again. `cacheTtlSeconds`
+(86400, a day, by default) is the new one: how long a value written to `cache` may still be served
+once the origin is genuinely unreachable. Keep it much larger than `pollingInterval` — if the two
+were close, the store would buy almost no protection over the in-memory snapshot alone.
+
+**A cold process reads the store before ever asking the origin**, and if what it holds is still
+within `pollingInterval`, that value is trusted outright with no request made at all. An older
+value is still handed to the server as the conditional-request baseline, so even a stale-but-
+unchanged entry costs only a 304, not a full refetch.
+
+**A poll that finds nothing changed still refreshes the store occasionally, not on every 304.** A
+long-lived process whose flags never change would otherwise let its own store entry lapse past
+`cacheTtlSeconds` despite polling successfully the whole time — the entry is rewritten once it's
+about half as old as `cacheTtlSeconds` allows, which keeps it from ever getting close to expiring
+under a healthy client without writing on every single poll.
+
+**A failure in your store never surfaces through `isEnabled`.** A blip in your own Redis is not the
+FeatureFlags server being unreachable, and is treated as a cache miss, not a client failure.
+
 ## Options
 
 | | | |
@@ -85,6 +146,9 @@ stop polling explicitly; the client keeps answering from its last snapshot after
 | `pollingInterval` | `30000` | Upper bound, in ms, on how long a toggle takes to arrive. |
 | `timeout` | `10000` | How long one refresh may take, in ms. |
 | `fetch` | global | For tests, or a proxy agent. |
+| `cache` | none | A `FeatureFlagsCacheStore` backed by your own Redis (or other store). Optional. |
+| `cacheTtlSeconds` | `86400` | How long a value in `cache` survives a real outage. Only meaningful with `cache` set. |
+| `cacheKeyPrefix` | `"featureflags:"` | Prefixed onto the key this client uses in `cache`, so it cannot collide with your application's own keys. The key already includes the installation's host and the SDK key's environment, so two environments — or two installations — sharing one store and the same `cacheKeyPrefix` still don't collide with each other. |
 
 ## Versioning
 

@@ -31,12 +31,18 @@ jobs:
         with:
           dotnet-version: "10.0.x"
 
-      # The project, not the directory: clients/dotnet also holds the test project, and packing a
-      # directory containing two projects fails. Only visible at release time, so it is spelled out.
+      # The projects, not the directory: clients/dotnet also holds the test projects, and packing a
+      # directory containing more than one project fails. Only visible at release time, so it is
+      # spelled out. FeatureFlags.Client.Redis ships on the same tag as the base package rather than
+      # its own — it references FeatureFlags.Client by project reference, so a version bump in one
+      # is a version bump in both, and a separate tag scheme would mean releasing it every time the
+      # base package moves for a reason the add-on had no part in.
       - name: Pack
         run: |
           VERSION="${GITHUB_REF_NAME#sdk-dotnet-v}"
           dotnet pack clients/dotnet/FeatureFlags.Client --configuration Release \
+            -p:MinVerVersionOverride="$VERSION" --output dist
+          dotnet pack clients/dotnet/FeatureFlags.Client.Redis --configuration Release \
             -p:MinVerVersionOverride="$VERSION" --output dist
 
       - name: Push
