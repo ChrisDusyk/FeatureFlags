@@ -121,7 +121,7 @@ The admin console (`frontend/`) is a React Router SPA that mirrors the backend's
 
 - `FeatureFlags.Domain.Tests` covers domain logic and the `Result`/`Option` primitives in isolation.
 - `FeatureFlags.Server.Tests` covers feature slices end-to-end as they're added.
-- Run the whole suite with `dotnet test FeatureFlags.sln`.
+- Run the whole suite with `dotnet test FeatureFlags.slnx`.
 - There is no JavaScript test runner in `frontend/` or `auth/` yet, so the auth path is covered on the .NET side (claims mapping, the authorization policies, the `User` mirror) and verified against a running stack.
 
 ## Running the app
