@@ -12,7 +12,7 @@ on:
       - "FeatureFlags.Infrastructure/**"
       - "FeatureFlags.Server/**"
       - "FeatureFlags.Server.Tests/**"
-      - "FeatureFlags.sln"
+      - "FeatureFlags.slnx"
       - "Directory.Build.props"
       - "global.json"
       - "nuget.config"
@@ -26,7 +26,7 @@ on:
       - "FeatureFlags.Infrastructure/**"
       - "FeatureFlags.Server/**"
       - "FeatureFlags.Server.Tests/**"
-      - "FeatureFlags.sln"
+      - "FeatureFlags.slnx"
       - "Directory.Build.props"
       - "global.json"
       - "nuget.config"
@@ -57,10 +57,10 @@ jobs:
             nuget-${{ runner.os }}-
 
       - name: Restore
-        run: dotnet restore FeatureFlags.sln
+        run: dotnet restore FeatureFlags.slnx
 
       - name: Build
-        run: dotnet build FeatureFlags.sln --no-restore --configuration Release
+        run: dotnet build FeatureFlags.slnx --no-restore --configuration Release
 
       - name: Test
-        run: dotnet test FeatureFlags.sln --no-build --no-restore --configuration Release
+        run: dotnet test FeatureFlags.slnx --no-build --no-restore --configuration Release
