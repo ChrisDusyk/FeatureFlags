@@ -342,4 +342,29 @@ public class FeatureFlagTests
 
         Assert.Empty(rehydrated.UncommittedEvents);
     }
+
+    [Fact]
+    public void Rehydrate_WithAnEventForAnotherFlag_ShouldThrow()
+    {
+        var original = FeatureFlag.Create("new-checkout", "New checkout", null, Nowhere, Now).Value;
+
+        Assert.Throws<InvalidOperationException>(() => FeatureFlag.Rehydrate(Guid.CreateVersion7(), original.UncommittedEvents));
+    }
+
+    [Fact]
+    public void Rehydrate_WithNoFlagCreatedEvent_ShouldThrow()
+    {
+        var original = FeatureFlag.Create("new-checkout", "New checkout", null, Nowhere, Now).Value;
+        var stateEventsOnly = original.UncommittedEvents.Skip(1);
+
+        Assert.Throws<InvalidOperationException>(() => FeatureFlag.Rehydrate(original.Id, stateEventsOnly));
+    }
+
+    [Fact]
+    public void UncommittedEvents_ShouldNotBeMutableThroughACastBackToAList()
+    {
+        var flag = FeatureFlag.Create("new-checkout", "New checkout", null, Nowhere, Now).Value;
+
+        Assert.IsNotType<List<IFlagEvent>>(flag.UncommittedEvents);
+    }
 }
