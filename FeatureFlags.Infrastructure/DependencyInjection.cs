@@ -16,6 +16,7 @@ public static class DependencyInjection
         builder.AddNpgsqlDbContext<AppDbContext>("featureflagsdb");
 
         builder.Services.AddScoped<IFeatureFlagRepository, FeatureFlagRepository>();
+        builder.Services.AddScoped<IFlagViewRepository, FlagViewRepository>();
         builder.Services.AddScoped<ISdkKeyRepository, SdkKeyRepository>();
         builder.Services.AddScoped<IUserRepository, UserRepository>();
 

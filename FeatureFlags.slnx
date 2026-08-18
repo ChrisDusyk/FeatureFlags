@@ -17,6 +17,7 @@
   <Project Path="FeatureFlags.AppHost/FeatureFlags.AppHost.csproj" />
   <Project Path="FeatureFlags.Domain.Tests/FeatureFlags.Domain.Tests.csproj" />
   <Project Path="FeatureFlags.Domain/FeatureFlags.Domain.csproj" />
+  <Project Path="FeatureFlags.Infrastructure.Tests/FeatureFlags.Infrastructure.Tests.csproj" />
   <Project Path="FeatureFlags.Infrastructure/FeatureFlags.Infrastructure.csproj" />
   <Project Path="FeatureFlags.Server.Tests/FeatureFlags.Server.Tests.csproj" />
   <Project Path="FeatureFlags.Server/FeatureFlags.Server.csproj" />

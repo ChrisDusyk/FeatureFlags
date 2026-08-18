@@ -6,4 +6,16 @@
     <Nullable>enable</Nullable>
   </PropertyGroup>
 
+  <!--
+    FeatureFlagRepository clears a flag's UncommittedEvents once it has durably appended them —
+    that has to be a real mutation on the aggregate, not something a repository fakes from outside,
+    so Infrastructure gets access to this one internal member rather than the method going public
+    for everyone.
+  -->
+  <ItemGroup>
+    <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleTo">
+      <_Parameter1>FeatureFlags.Infrastructure</_Parameter1>
+    </AssemblyAttribute>
+  </ItemGroup>
+
 </Project>
