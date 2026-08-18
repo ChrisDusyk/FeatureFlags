@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Link } from 'react-router-dom';
 
 import type { Environment } from '../../shell/environment';
 import { ApiError, setFlagState, type Flag } from './api';
@@ -61,7 +62,7 @@ export function FlagRow({
 
   return (
     <li className={`flagrow flagrow--${state}`}>
-      <div className="flagrow__body">
+      <Link className="flagrow__body" to={`/flags/${encodeURIComponent(flag.key)}`}>
         <p className="flagrow__key">{flag.key}</p>
         <p className="flagrow__name">{flag.name}</p>
         {flag.description && <p className="flagrow__desc">{flag.description}</p>}
@@ -80,7 +81,7 @@ export function FlagRow({
             {error}
           </p>
         )}
-      </div>
+      </Link>
 
       <button
         type="button"
@@ -89,7 +90,10 @@ export function FlagRow({
         aria-checked={flag.isEnabled}
         aria-label={`${flag.name} in ${environment.name}`}
         disabled={pending}
-        onClick={() => void toggle()}
+        onClick={(event) => {
+          event.stopPropagation();
+          void toggle();
+        }}
       >
         <span className="switch__track" aria-hidden="true">
           <span className="switch__thumb" />

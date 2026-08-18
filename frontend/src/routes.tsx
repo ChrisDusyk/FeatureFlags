@@ -6,6 +6,7 @@ import { NotFoundPage } from './features/overview/NotFoundPage';
 import { SignInPage } from './features/auth/SignInPage';
 import { SignUpPage } from './features/auth/SignUpPage';
 import { FlagsPage } from './features/flags/FlagsPage';
+import { FlagDetailPage } from './features/flags/FlagDetailPage';
 import { SegmentsPage } from './features/segments/SegmentsPage';
 import { RulesPage } from './features/rules/RulesPage';
 import { MembersPage } from './features/organization/MembersPage';
@@ -25,6 +26,7 @@ export const router = createBrowserRouter([
         children: [
           { index: true, element: <OverviewPage /> },
           { path: 'flags', element: <FlagsPage /> },
+          { path: 'flags/:key', element: <FlagDetailPage /> },
           { path: 'segments', element: <SegmentsPage /> },
           { path: 'rules', element: <RulesPage /> },
           { path: 'organization/members', element: <MembersPage /> },
