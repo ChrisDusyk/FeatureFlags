@@ -78,7 +78,8 @@ public sealed class FeatureFlag
         string? name,
         string? description,
         IEnumerable<EnvironmentKey> enabledIn,
-        DateTimeOffset timestamp)
+        DateTimeOffset timestamp,
+        Guid causedBy)
     {
         var keyResult = FlagKey.Create(key);
         if (keyResult.IsFailure)
@@ -98,10 +99,10 @@ public sealed class FeatureFlag
         var enabled = enabledIn.ToHashSet();
 
         var flag = new FeatureFlag(Guid.CreateVersion7());
-        flag.Raise(new FlagCreatedEvent(flag.Id, keyResult.Value, trimmedName, trimmedDescription, timestamp));
+        flag.Raise(new FlagCreatedEvent(flag.Id, keyResult.Value, trimmedName, trimmedDescription, timestamp, causedBy));
 
         foreach (var environment in EnvironmentKey.All)
-            flag.Raise(new FlagStateChangedEvent(flag.Id, environment, enabled.Contains(environment), timestamp));
+            flag.Raise(new FlagStateChangedEvent(flag.Id, environment, enabled.Contains(environment), timestamp, causedBy));
 
         return Result.Success(flag);
     }
@@ -151,16 +152,43 @@ public sealed class FeatureFlag
     /// Turns the flag on or off in one environment. Idempotent — setting the state it is already in
     /// raises no event and leaves both the state and its timestamp untouched.
     /// </summary>
-    public Result SetEnabled(EnvironmentKey environment, bool isEnabled, DateTimeOffset timestamp) =>
+    public Result SetEnabled(EnvironmentKey environment, bool isEnabled, DateTimeOffset timestamp, Guid causedBy) =>
         StateIn(environment).Match(
             state =>
             {
                 if (state.IsEnabled != isEnabled)
-                    Raise(new FlagStateChangedEvent(Id, environment, isEnabled, timestamp));
+                    Raise(new FlagStateChangedEvent(Id, environment, isEnabled, timestamp, causedBy));
 
                 return Result.Success();
             },
             () => Result.Failure(FlagErrors.StateMissing(Key, environment)));
+
+    /// <summary>
+    /// Updates the flag's name and/or description. Idempotent — submitting the values it already
+    /// has raises no event and leaves <see cref="UpdatedAt"/> untouched, the same rule
+    /// <see cref="SetEnabled"/> applies to state. The key is never part of this: there is no
+    /// parameter for it, and no other way to change it.
+    /// </summary>
+    public Result UpdateDetails(string? name, string? description, DateTimeOffset timestamp, Guid causedBy)
+    {
+        if (string.IsNullOrWhiteSpace(name))
+            return Result.Failure(FlagErrors.NameRequired);
+
+        var trimmedName = name.Trim();
+        if (trimmedName.Length > MaxNameLength)
+            return Result.Failure(FlagErrors.NameTooLong);
+
+        var trimmedDescription = description?.Trim() ?? string.Empty;
+        if (trimmedDescription.Length > MaxDescriptionLength)
+            return Result.Failure(FlagErrors.DescriptionTooLong);
+
+        if (trimmedName == Name && trimmedDescription == Description)
+            return Result.Success();
+
+        Raise(new FlagDetailsChangedEvent(Id, trimmedName, trimmedDescription, timestamp, causedBy));
+
+        return Result.Success();
+    }
 
     /// <summary>Clears events once the repository has durably appended them.</summary>
     internal void ClearUncommittedEvents() => _uncommittedEvents.Clear();
@@ -191,6 +219,12 @@ public sealed class FeatureFlag
                     _states.Add(new FlagState(stateChanged.Environment, stateChanged.IsEnabled, stateChanged.OccurredAt));
                 else
                     existing.Apply(stateChanged.IsEnabled, stateChanged.OccurredAt);
+                break;
+
+            case FlagDetailsChangedEvent detailsChanged:
+                Name = detailsChanged.Name;
+                Description = detailsChanged.Description;
+                UpdatedAt = detailsChanged.OccurredAt;
                 break;
 
             // An event type this build does not know about is a corrupted or forward-incompatible

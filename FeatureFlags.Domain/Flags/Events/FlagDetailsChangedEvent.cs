@@ -1,8 +1,7 @@
 namespace FeatureFlags.Domain.Flags.Events;
 
-public sealed record FlagCreatedEvent(
+public sealed record FlagDetailsChangedEvent(
     Guid FlagId,
-    FlagKey Key,
     string Name,
     string Description,
     DateTimeOffset OccurredAt,

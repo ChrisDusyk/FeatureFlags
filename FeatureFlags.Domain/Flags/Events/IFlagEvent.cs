@@ -8,4 +8,11 @@ public interface IFlagEvent
 {
     Guid FlagId { get; }
     DateTimeOffset OccurredAt { get; }
+
+    /// <summary>
+    /// Who caused this. Null only for events a migration backfilled from state that predated
+    /// this field — every event raised going forward always carries one, since every mutating
+    /// endpoint requires a signed-in user.
+    /// </summary>
+    Guid? CausedBy { get; }
 }
