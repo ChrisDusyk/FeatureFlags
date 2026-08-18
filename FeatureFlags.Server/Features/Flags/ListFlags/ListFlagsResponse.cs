@@ -15,7 +15,7 @@ public sealed record FlagSummary(
     bool IsEnabled,
     DateTimeOffset UpdatedAt)
 {
-    public static FlagSummary From(FeatureFlag flag, EnvironmentKey environment) =>
+    public static FlagSummary From(FlagView flag, EnvironmentKey environment) =>
         flag.StateIn(environment).Match(
             state => new FlagSummary(
                 flag.Id,

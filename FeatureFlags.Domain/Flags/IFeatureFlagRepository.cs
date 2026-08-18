@@ -4,9 +4,6 @@ namespace FeatureFlags.Domain.Flags;
 
 public interface IFeatureFlagRepository
 {
-    /// <summary>Every flag, ordered by key. Each carries its state for all environments.</summary>
-    Task<IReadOnlyList<FeatureFlag>> ListAsync(CancellationToken cancellationToken = default);
-
     Task<Option<FeatureFlag>> GetByKeyAsync(FlagKey key, CancellationToken cancellationToken = default);
 
     Task AddAsync(FeatureFlag flag, CancellationToken cancellationToken = default);

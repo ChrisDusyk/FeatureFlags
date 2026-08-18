@@ -95,25 +95,6 @@ internal sealed class FeatureFlagRepository(AppDbContext dbContext) : IFeatureFl
     }
 
     /// <summary>
-    /// Every flag, replayed from its own event stream. Transitional: the Server-layer read slices
-    /// still call this today, but they are moving to <see cref="IFlagViewRepository"/>, which reads
-    /// <see cref="FlagRow"/> directly instead of replaying history for a listing.
-    /// </summary>
-    // TODO(event-sourcing-pr3): remove once IFeatureFlagRepository.ListAsync has no more callers.
-    public async Task<IReadOnlyList<FeatureFlag>> ListAsync(CancellationToken cancellationToken = default)
-    {
-        var rows = await dbContext.FlagRows
-            .OrderBy(row => row.Key)
-            .ToListAsync(cancellationToken);
-
-        var flags = new List<FeatureFlag>(rows.Count);
-        foreach (var row in rows)
-            flags.Add(_tracked.FirstOrDefault(entry => entry.Row.Id == row.Id).Flag ?? await RehydrateAsync(row, cancellationToken));
-
-        return flags;
-    }
-
-    /// <summary>
     /// Rehydrates <paramref name="row"/>'s flag and starts tracking it. Callers check the identity
     /// map themselves first — this method only ever adds a new entry, never looks one up — so it
     /// stays the one place <c>_tracked</c> grows.

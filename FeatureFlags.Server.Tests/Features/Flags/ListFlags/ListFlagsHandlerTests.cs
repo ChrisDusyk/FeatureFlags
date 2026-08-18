@@ -11,16 +11,28 @@ public class ListFlagsHandlerTests
 
     private static readonly EnvironmentKey[] Nowhere = [];
 
-    private readonly FakeFeatureFlagRepository _repository = new();
+    private readonly FakeFlagViewRepository _repository = new();
 
     private ListFlagsHandler CreateSut() => new(_repository);
 
-    private FeatureFlag Seed(string key, params EnvironmentKey[] enabledIn)
-    {
-        var flag = FeatureFlag.Create(key, key, null, enabledIn, Now).Value;
-        _repository.Seed(flag);
+    private FlagView Seed(string key, params EnvironmentKey[] enabledIn) => Seed(key, key, null, enabledIn);
 
-        return flag;
+    private FlagView Seed(string key, string name, string? description, params EnvironmentKey[] enabledIn)
+    {
+        var flagKey = FlagKey.Create(key).Value;
+        var enabled = enabledIn.ToHashSet();
+
+        var view = new FlagView(
+            Guid.CreateVersion7(),
+            flagKey,
+            name,
+            description ?? string.Empty,
+            Now,
+            Now,
+            [.. EnvironmentKey.All.Select(environment => new FlagStateView(environment, enabled.Contains(environment), Now))]);
+
+        _repository.Seed(view);
+        return view;
     }
 
     [Fact]
@@ -84,7 +96,7 @@ public class ListFlagsHandlerTests
     {
         var flag = Seed("new-checkout", Nowhere);
         var later = Now.AddHours(5);
-        flag.SetEnabled(EnvironmentKey.Production, isEnabled: true, later);
+        _repository.SetEnabled(flag.Key, EnvironmentKey.Production, isEnabled: true, later);
 
         var inProduction = await CreateSut().HandleAsync(
             new ListFlagsQuery(EnvironmentKey.Production),
@@ -111,8 +123,7 @@ public class ListFlagsHandlerTests
     [Fact]
     public async Task HandleAsync_ShouldCarryNameAndDescriptionUnchangedAcrossEnvironments()
     {
-        var flag = FeatureFlag.Create("new-checkout", "New checkout", "Notes.", [EnvironmentKey.Development], Now).Value;
-        _repository.Seed(flag);
+        var flag = Seed("new-checkout", "New checkout", "Notes.", EnvironmentKey.Development);
 
         var inProduction = await CreateSut().HandleAsync(
             new ListFlagsQuery(EnvironmentKey.Production),

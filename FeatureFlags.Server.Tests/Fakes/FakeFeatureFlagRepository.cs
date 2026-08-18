@@ -30,10 +30,6 @@ internal sealed class FakeFeatureFlagRepository : IFeatureFlagRepository
     /// </summary>
     public void FailNextSaveWith(Error error) => _nextSaveFailure = error;
 
-    public Task<IReadOnlyList<FeatureFlag>> ListAsync(CancellationToken cancellationToken = default) =>
-        Task.FromResult<IReadOnlyList<FeatureFlag>>(
-            [.. _committed.Values.OrderBy(flag => flag.Key.Value, StringComparer.Ordinal)]);
-
     public Task<Option<FeatureFlag>> GetByKeyAsync(FlagKey key, CancellationToken cancellationToken = default) =>
         Task.FromResult(_committed.TryGetValue(key, out var flag)
             ? Option<FeatureFlag>.Some(flag)

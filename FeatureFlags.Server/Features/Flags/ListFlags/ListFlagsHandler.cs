@@ -3,7 +3,7 @@ using FeatureFlags.Domain.Shared;
 
 namespace FeatureFlags.Server.Features.Flags.ListFlags;
 
-public sealed class ListFlagsHandler(IFeatureFlagRepository repository)
+public sealed class ListFlagsHandler(IFlagViewRepository repository)
 {
     public async Task<Result<ListFlagsResponse>> HandleAsync(
         ListFlagsQuery query,
