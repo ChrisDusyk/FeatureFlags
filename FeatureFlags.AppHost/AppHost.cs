@@ -2,7 +2,9 @@ var builder = DistributedApplication.CreateBuilder(args);
 
 var cache = builder.AddRedis("cache");
 
-var postgres = builder.AddPostgres("postgres").WithDataVolume();
+var postgres = builder.AddPostgres("postgres")
+    .WithDataVolume()
+    .WithPgAdmin();
 var featureFlagsDb = postgres.AddDatabase("featureflagsdb");
 
 var authSecret = builder.AddParameter("auth-secret", secret: true);
