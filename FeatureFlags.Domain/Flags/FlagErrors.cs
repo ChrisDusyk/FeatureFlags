@@ -33,6 +33,12 @@ public static class FlagErrors
         "Flag.DuplicateKey",
         $"A flag with the key '{key}' already exists.");
 
+    /// <summary>Another writer appended an event for this flag between this caller's read and its
+    /// write — the store's own sequence-number check caught it, so the caller must reload.</summary>
+    public static Error ConcurrencyConflict(FlagKey key) => Error.Conflict(
+        "Flag.ConcurrencyConflict",
+        $"The flag '{key}' was changed by someone else. Reload and try again.");
+
     public static Error NotFound(FlagKey key) => Error.NotFound(
         "Flag.NotFound",
         $"No flag with the key '{key}' exists.");
