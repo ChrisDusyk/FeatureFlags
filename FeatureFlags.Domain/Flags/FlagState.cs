@@ -28,13 +28,14 @@ public sealed class FlagState
     /// </summary>
     public DateTimeOffset UpdatedAt { get; private set; }
 
-    /// <summary>Idempotent: setting the state it is already in leaves the timestamp alone too.</summary>
-    internal void SetEnabled(bool isEnabled, DateTimeOffset timestamp)
+    /// <summary>
+    /// Folds a <c>FlagStateChanged</c> fact into this state. Unconditional — whether this is worth
+    /// raising at all is a decision <see cref="FeatureFlag.SetEnabled"/> makes before an event ever
+    /// reaches here, not something this method judges.
+    /// </summary>
+    internal void Apply(bool isEnabled, DateTimeOffset updatedAt)
     {
-        if (IsEnabled == isEnabled)
-            return;
-
         IsEnabled = isEnabled;
-        UpdatedAt = timestamp;
+        UpdatedAt = updatedAt;
     }
 }

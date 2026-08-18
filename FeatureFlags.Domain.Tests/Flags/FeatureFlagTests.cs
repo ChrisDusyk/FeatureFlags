@@ -1,5 +1,6 @@
 using FeatureFlags.Domain.Environments;
 using FeatureFlags.Domain.Flags;
+using FeatureFlags.Domain.Flags.Events;
 using FeatureFlags.Domain.Shared;
 
 namespace FeatureFlags.Domain.Tests.Flags;
@@ -241,5 +242,129 @@ public class FeatureFlagTests
 
         Assert.False(flag.IsEnabledIn(EnvironmentKey.Development));
         Assert.Equal(later, flag.StateIn(EnvironmentKey.Development).Match(state => state.UpdatedAt, () => default));
+    }
+
+    [Fact]
+    public void Create_ShouldRaiseOneFlagCreatedEventFollowedByOneFlagStateChangedEventPerEnvironment()
+    {
+        var flag = FeatureFlag.Create(
+            "new-checkout",
+            "New checkout",
+            "Rolls out the rewritten checkout.",
+            [EnvironmentKey.Staging],
+            Now).Value;
+
+        Assert.Equal(1 + EnvironmentKey.All.Count, flag.UncommittedEvents.Count);
+
+        var created = Assert.IsType<FlagCreatedEvent>(flag.UncommittedEvents[0]);
+        Assert.Equal(flag.Id, created.FlagId);
+        Assert.Equal("new-checkout", created.Key.Value);
+        Assert.Equal("New checkout", created.Name);
+        Assert.Equal("Rolls out the rewritten checkout.", created.Description);
+        Assert.Equal(Now, created.OccurredAt);
+
+        var stateEvents = flag.UncommittedEvents.Skip(1).Cast<FlagStateChangedEvent>().ToList();
+        Assert.Equal(EnvironmentKey.All, [.. stateEvents.Select(e => e.Environment)]);
+        Assert.All(stateEvents, e => Assert.Equal(Now, e.OccurredAt));
+        Assert.True(stateEvents.Single(e => e.Environment == EnvironmentKey.Staging).IsEnabled);
+        Assert.False(stateEvents.Single(e => e.Environment == EnvironmentKey.Development).IsEnabled);
+    }
+
+    [Fact]
+    public void Create_ShouldSetVersionToTheNumberOfEventsRaised()
+    {
+        var flag = FeatureFlag.Create("new-checkout", "New checkout", null, Nowhere, Now).Value;
+
+        Assert.Equal(1 + EnvironmentKey.All.Count, flag.Version);
+    }
+
+    [Fact]
+    public void SetEnabled_WhenValueChanges_ShouldRaiseExactlyOneEventAndIncrementVersion()
+    {
+        var flag = FeatureFlag.Create("new-checkout", "New checkout", null, Nowhere, Now).Value;
+        var eventCountAfterCreate = flag.UncommittedEvents.Count;
+        var versionAfterCreate = flag.Version;
+
+        flag.SetEnabled(EnvironmentKey.Production, isEnabled: true, Now.AddHours(1));
+
+        Assert.Equal(eventCountAfterCreate + 1, flag.UncommittedEvents.Count);
+        var stateChanged = Assert.IsType<FlagStateChangedEvent>(flag.UncommittedEvents[^1]);
+        Assert.Equal(EnvironmentKey.Production, stateChanged.Environment);
+        Assert.True(stateChanged.IsEnabled);
+        Assert.Equal(versionAfterCreate + 1, flag.Version);
+    }
+
+    [Fact]
+    public void SetEnabled_WhenAlreadyInThatState_ShouldRaiseNoEventAndLeaveVersionUnchanged()
+    {
+        var flag = FeatureFlag.Create("new-checkout", "New checkout", null, [EnvironmentKey.Development], Now).Value;
+        var eventCountAfterCreate = flag.UncommittedEvents.Count;
+        var versionAfterCreate = flag.Version;
+
+        var result = flag.SetEnabled(EnvironmentKey.Development, isEnabled: true, Now.AddHours(1));
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(eventCountAfterCreate, flag.UncommittedEvents.Count);
+        Assert.Equal(versionAfterCreate, flag.Version);
+    }
+
+    [Fact]
+    public void Rehydrate_ShouldFoldEventsIntoTheSameStateAsTheOriginalInstance()
+    {
+        var original = FeatureFlag.Create(
+            "new-checkout",
+            "New checkout",
+            "Rolls out the rewritten checkout.",
+            [EnvironmentKey.Development],
+            Now).Value;
+        original.SetEnabled(EnvironmentKey.Staging, isEnabled: true, Now.AddHours(1));
+        original.SetEnabled(EnvironmentKey.Development, isEnabled: false, Now.AddHours(2));
+
+        var rehydrated = FeatureFlag.Rehydrate(original.Id, original.UncommittedEvents);
+
+        Assert.Equal(original.Id, rehydrated.Id);
+        Assert.Equal(original.Key, rehydrated.Key);
+        Assert.Equal(original.Name, rehydrated.Name);
+        Assert.Equal(original.Description, rehydrated.Description);
+        Assert.Equal(original.CreatedAt, rehydrated.CreatedAt);
+        Assert.Equal(original.UpdatedAt, rehydrated.UpdatedAt);
+        Assert.Equal(original.Version, rehydrated.Version);
+        Assert.All(EnvironmentKey.All, environment =>
+            Assert.Equal(original.IsEnabledIn(environment), rehydrated.IsEnabledIn(environment)));
+    }
+
+    [Fact]
+    public void Rehydrate_ShouldLeaveNoUncommittedEvents()
+    {
+        var original = FeatureFlag.Create("new-checkout", "New checkout", null, Nowhere, Now).Value;
+
+        var rehydrated = FeatureFlag.Rehydrate(original.Id, original.UncommittedEvents);
+
+        Assert.Empty(rehydrated.UncommittedEvents);
+    }
+
+    [Fact]
+    public void Rehydrate_WithAnEventForAnotherFlag_ShouldThrow()
+    {
+        var original = FeatureFlag.Create("new-checkout", "New checkout", null, Nowhere, Now).Value;
+
+        Assert.Throws<InvalidOperationException>(() => FeatureFlag.Rehydrate(Guid.CreateVersion7(), original.UncommittedEvents));
+    }
+
+    [Fact]
+    public void Rehydrate_WithNoFlagCreatedEvent_ShouldThrow()
+    {
+        var original = FeatureFlag.Create("new-checkout", "New checkout", null, Nowhere, Now).Value;
+        var stateEventsOnly = original.UncommittedEvents.Skip(1);
+
+        Assert.Throws<InvalidOperationException>(() => FeatureFlag.Rehydrate(original.Id, stateEventsOnly));
+    }
+
+    [Fact]
+    public void UncommittedEvents_ShouldNotBeMutableThroughACastBackToAList()
+    {
+        var flag = FeatureFlag.Create("new-checkout", "New checkout", null, Nowhere, Now).Value;
+
+        Assert.IsNotType<List<IFlagEvent>>(flag.UncommittedEvents);
     }
 }

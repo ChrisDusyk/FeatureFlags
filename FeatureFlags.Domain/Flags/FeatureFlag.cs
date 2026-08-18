@@ -1,4 +1,5 @@
 using FeatureFlags.Domain.Environments;
+using FeatureFlags.Domain.Flags.Events;
 using FeatureFlags.Domain.Shared;
 
 namespace FeatureFlags.Domain.Flags;
@@ -10,6 +11,12 @@ namespace FeatureFlags.Domain.Flags;
 /// <em>on</em> is answered once per environment by a <see cref="FlagState"/>, so a feature can be
 /// live in development and dark in production while still being the same flag.
 /// </para>
+/// <para>
+/// State lives nowhere but the events in <see cref="UncommittedEvents"/> and whatever a prior
+/// <see cref="Rehydrate"/> folded in — <see cref="Create"/> and <see cref="SetEnabled"/> are the
+/// only two ways a flag's facts change, and both change them by raising an event rather than by
+/// setting a field directly.
+/// </para>
 /// Timestamps are supplied by the caller rather than read from a clock so the entity stays deterministic.
 /// </summary>
 public sealed class FeatureFlag
@@ -18,24 +25,24 @@ public sealed class FeatureFlag
     public const int MaxDescriptionLength = 1000;
 
     private readonly List<FlagState> _states = [];
+    private readonly List<IFlagEvent> _uncommittedEvents = [];
 
-    private FeatureFlag(
-        Guid id,
-        FlagKey key,
-        string name,
-        string description,
-        DateTimeOffset createdAt,
-        DateTimeOffset updatedAt)
+    // IDE0032 suggests an auto property here, which would leave a settable int for EF to pick up
+    // by convention if this type is ever queried again — see the Version property below.
+#pragma warning disable IDE0032
+    private int _version;
+#pragma warning restore IDE0032
+
+    private FeatureFlag(Guid id)
     {
         Id = id;
-        Key = key;
-        Name = name;
-        Description = description;
-        CreatedAt = createdAt;
-        UpdatedAt = updatedAt;
+        Key = null!;
+        Name = null!;
+        Description = null!;
     }
 
-    // EF Core materialization only.
+    // EF Core materialization only. Goes away once the repository stops mapping this type
+    // directly to a table and reconstructs it from flag_events instead.
     private FeatureFlag()
     {
         Key = null!;
@@ -57,6 +64,18 @@ public sealed class FeatureFlag
 
     /// <summary>One state per environment in <see cref="EnvironmentKey.All"/>, always.</summary>
     public IReadOnlyCollection<FlagState> States => _states;
+
+    /// <summary>How many events have been applied to this instance, fresh or replayed — its place
+    /// in its own stream. Getter-only and backed by a field, not an auto-property, so EF's
+    /// by-convention mapping has no settable scalar to pick up if this type is ever queried again.</summary>
+    public int Version => _version;
+
+    /// <summary>
+    /// Events raised since this instance was created or rehydrated, not yet appended. Wrapped
+    /// rather than returning <c>_uncommittedEvents</c> itself, so a caller cannot cast back to
+    /// <see cref="List{T}"/> and mutate or clear it out from under the aggregate.
+    /// </summary>
+    public IReadOnlyList<IFlagEvent> UncommittedEvents => _uncommittedEvents.AsReadOnly();
 
     /// <summary>
     /// Creates a flag in every environment at once. It is on only where <paramref name="enabledIn"/>
@@ -87,18 +106,43 @@ public sealed class FeatureFlag
 
         var enabled = enabledIn.ToHashSet();
 
-        var flag = new FeatureFlag(
-            Guid.CreateVersion7(),
-            keyResult.Value,
-            trimmedName,
-            trimmedDescription,
-            timestamp,
-            timestamp);
+        var flag = new FeatureFlag(Guid.CreateVersion7());
+        flag.Raise(new FlagCreatedEvent(flag.Id, keyResult.Value, trimmedName, trimmedDescription, timestamp));
 
         foreach (var environment in EnvironmentKey.All)
-            flag._states.Add(new FlagState(environment, enabled.Contains(environment), timestamp));
+            flag.Raise(new FlagStateChangedEvent(flag.Id, environment, enabled.Contains(environment), timestamp));
 
         return Result.Success(flag);
+    }
+
+    /// <summary>
+    /// Rebuilds a flag by folding its full event history in order — no business validation, since
+    /// every event already happened. The result carries no uncommitted events: replaying history is
+    /// not the same as making it.
+    /// </summary>
+    /// <exception cref="InvalidOperationException">
+    /// The stream belongs to a different flag, or its first event is not a <see cref="FlagCreatedEvent"/>.
+    /// Both mean the repository handed this a corrupted or mismatched stream — a store bug, not
+    /// something a caller can recover from, so this fails loudly rather than returning a flag with
+    /// null required fields.
+    /// </exception>
+    public static FeatureFlag Rehydrate(Guid id, IEnumerable<IFlagEvent> events)
+    {
+        var flag = new FeatureFlag(id);
+
+        foreach (var @event in events)
+        {
+            if (@event.FlagId != id)
+                throw new InvalidOperationException(
+                    $"Cannot rehydrate flag {id}: encountered an event for flag {@event.FlagId}.");
+
+            flag.Apply(@event);
+        }
+
+        if (flag.Key is null)
+            throw new InvalidOperationException($"Cannot rehydrate flag {id}: its stream contains no FlagCreatedEvent.");
+
+        return flag;
     }
 
     public bool IsEnabledIn(EnvironmentKey environment) =>
@@ -114,14 +158,57 @@ public sealed class FeatureFlag
 
     /// <summary>
     /// Turns the flag on or off in one environment. Idempotent — setting the state it is already in
-    /// leaves both the state and its timestamp untouched.
+    /// raises no event and leaves both the state and its timestamp untouched.
     /// </summary>
     public Result SetEnabled(EnvironmentKey environment, bool isEnabled, DateTimeOffset timestamp) =>
         StateIn(environment).Match(
             state =>
             {
-                state.SetEnabled(isEnabled, timestamp);
+                if (state.IsEnabled != isEnabled)
+                    Raise(new FlagStateChangedEvent(Id, environment, isEnabled, timestamp));
+
                 return Result.Success();
             },
             () => Result.Failure(FlagErrors.StateMissing(Key, environment)));
+
+    /// <summary>Clears events once the repository has durably appended them.</summary>
+    internal void ClearUncommittedEvents() => _uncommittedEvents.Clear();
+
+    private void Raise(IFlagEvent @event)
+    {
+        Apply(@event);
+        _uncommittedEvents.Add(@event);
+    }
+
+    /// <summary>The one place a fact — fresh or replayed — is folded into this instance's state.</summary>
+    private void Apply(IFlagEvent @event)
+    {
+        switch (@event)
+        {
+            case FlagCreatedEvent created:
+                Id = created.FlagId;
+                Key = created.Key;
+                Name = created.Name;
+                Description = created.Description;
+                CreatedAt = created.OccurredAt;
+                UpdatedAt = created.OccurredAt;
+                break;
+
+            case FlagStateChangedEvent stateChanged:
+                var existing = _states.FirstOrDefault(state => state.Environment == stateChanged.Environment);
+                if (existing is null)
+                    _states.Add(new FlagState(stateChanged.Environment, stateChanged.IsEnabled, stateChanged.OccurredAt));
+                else
+                    existing.Apply(stateChanged.IsEnabled, stateChanged.OccurredAt);
+                break;
+
+            // An event type this build does not know about is a corrupted or forward-incompatible
+            // stream, not a fact to skip — folding it silently would advance Version past a dropped
+            // change and hand back an aggregate that looks consistent but is not.
+            default:
+                throw new InvalidOperationException($"Unrecognized flag event type '{@event.GetType()}' on flag {Id}.");
+        }
+
+        _version++;
+    }
 }
