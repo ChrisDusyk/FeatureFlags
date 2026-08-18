@@ -15,9 +15,6 @@ public sealed class FlagState
         UpdatedAt = updatedAt;
     }
 
-    // EF Core materialization only.
-    private FlagState() => Environment = null!;
-
     public EnvironmentKey Environment { get; private set; }
     public bool IsEnabled { get; private set; }
 

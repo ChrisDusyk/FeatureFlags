@@ -1,38 +1,66 @@
 using System.Diagnostics.CodeAnalysis;
 using FeatureFlags.Domain.Flags;
+using FeatureFlags.Domain.Flags.Events;
 using FeatureFlags.Domain.Shared;
 using FeatureFlags.Infrastructure.Persistence.Configurations;
+using FeatureFlags.Infrastructure.Persistence.Events;
+using FeatureFlags.Infrastructure.Persistence.ReadModels;
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
 
 namespace FeatureFlags.Infrastructure.Persistence.Repositories;
 
+/// <summary>
+/// The write side. <see cref="FeatureFlag"/> is no longer EF-tracked directly — this repository
+/// reconstructs it by replaying <c>flag_events</c>, and on save appends whatever new events a
+/// command raised and syncs the corresponding <see cref="FlagRow"/> from the aggregate's resulting
+/// state, in one transaction.
+/// </summary>
 internal sealed class FeatureFlagRepository(AppDbContext dbContext) : IFeatureFlagRepository
 {
-    public async Task<IReadOnlyList<FeatureFlag>> ListAsync(CancellationToken cancellationToken = default) =>
-        // Owned collections come along without an Include, so every flag arrives with its states.
-        await dbContext.FeatureFlags
-            .OrderBy(flag => flag.Key)
-            .ToListAsync(cancellationToken);
+    private readonly List<(FeatureFlag Flag, FlagRow Row)> _tracked = [];
 
     public async Task<Option<FeatureFlag>> GetByKeyAsync(FlagKey key, CancellationToken cancellationToken = default)
     {
-        var flag = await dbContext.FeatureFlags
+        var row = await dbContext.FlagRows
             .FirstOrDefaultAsync(candidate => candidate.Key == key, cancellationToken);
 
-        return flag.ToOption();
+        if (row is null)
+            return Option<FeatureFlag>.None;
+
+        var flag = await RehydrateAsync(row, cancellationToken);
+        return Option<FeatureFlag>.Some(flag);
     }
 
-    public async Task AddAsync(FeatureFlag flag, CancellationToken cancellationToken = default) =>
-        await dbContext.FeatureFlags.AddAsync(flag, cancellationToken);
+    public Task AddAsync(FeatureFlag flag, CancellationToken cancellationToken = default)
+    {
+        var row = ToNewRow(flag);
+        dbContext.FlagRows.Add(row);
+        _tracked.Add((flag, row));
+
+        return Task.CompletedTask;
+    }
 
     public async Task<Result> SaveChangesAsync(CancellationToken cancellationToken = default)
     {
+        foreach (var (flag, row) in _tracked)
+        {
+            if (flag.UncommittedEvents.Count == 0)
+                continue;
+
+            var startingSequence = flag.Version - flag.UncommittedEvents.Count + 1;
+            for (var i = 0; i < flag.UncommittedEvents.Count; i++)
+            {
+                var record = FlagEventSerializer.ToRecord(flag.Id, startingSequence + i, flag.UncommittedEvents[i]);
+                dbContext.FlagEvents.Add(record);
+            }
+
+            SyncRow(row, flag);
+        }
+
         try
         {
             await dbContext.SaveChangesAsync(cancellationToken);
-
-            return Result.Success();
         }
         catch (DbUpdateException exception) when (TryGetDuplicateKey(exception, out var duplicateKey))
         {
@@ -40,8 +68,88 @@ internal sealed class FeatureFlagRepository(AppDbContext dbContext) : IFeatureFl
             // index is what actually settles the race; translating it keeps the outcome a Conflict
             // rather than an unhandled exception.
             dbContext.ChangeTracker.Clear();
+            _tracked.Clear();
 
             return Result.Failure(FlagErrors.DuplicateKey(duplicateKey));
+        }
+        catch (DbUpdateException exception) when (IsConcurrencyConflict(exception, out var conflictedKey))
+        {
+            dbContext.ChangeTracker.Clear();
+            _tracked.Clear();
+
+            return Result.Failure(FlagErrors.ConcurrencyConflict(conflictedKey!));
+        }
+
+        foreach (var (flag, _) in _tracked)
+            flag.ClearUncommittedEvents();
+
+        return Result.Success();
+    }
+
+    /// <summary>
+    /// Every flag, replayed from its own event stream. Transitional: the Server-layer read slices
+    /// still call this today, but they are moving to <see cref="IFlagViewRepository"/>, which reads
+    /// <see cref="FlagRow"/> directly instead of replaying history for a listing.
+    /// </summary>
+    // TODO(event-sourcing-pr3): remove once IFeatureFlagRepository.ListAsync has no more callers.
+    public async Task<IReadOnlyList<FeatureFlag>> ListAsync(CancellationToken cancellationToken = default)
+    {
+        var rows = await dbContext.FlagRows
+            .OrderBy(row => row.Key)
+            .ToListAsync(cancellationToken);
+
+        var flags = new List<FeatureFlag>(rows.Count);
+        foreach (var row in rows)
+            flags.Add(await RehydrateAsync(row, cancellationToken));
+
+        return flags;
+    }
+
+    private async Task<FeatureFlag> RehydrateAsync(FlagRow row, CancellationToken cancellationToken)
+    {
+        var records = await dbContext.FlagEvents
+            .Where(record => record.FlagId == row.Id)
+            .OrderBy(record => record.SequenceNumber)
+            .ToListAsync(cancellationToken);
+
+        var flag = FeatureFlag.Rehydrate(row.Id, records.Select(FlagEventSerializer.ToEvent));
+        _tracked.Add((flag, row));
+
+        return flag;
+    }
+
+    private static FlagRow ToNewRow(FeatureFlag flag) => new()
+    {
+        Id = flag.Id,
+        Key = flag.Key,
+        Name = flag.Name,
+        Description = flag.Description,
+        CreatedAt = flag.CreatedAt,
+        UpdatedAt = flag.UpdatedAt,
+        States = [.. flag.States.Select(state => new FlagStateRow
+        {
+            Environment = state.Environment,
+            IsEnabled = state.IsEnabled,
+            UpdatedAt = state.UpdatedAt,
+        })],
+    };
+
+    private static void SyncRow(FlagRow row, FeatureFlag flag)
+    {
+        row.Name = flag.Name;
+        row.Description = flag.Description;
+        row.UpdatedAt = flag.UpdatedAt;
+
+        foreach (var state in flag.States)
+        {
+            var stateRow = row.States.FirstOrDefault(candidate => candidate.Environment == state.Environment);
+            if (stateRow is null)
+                row.States.Add(new FlagStateRow { Environment = state.Environment, IsEnabled = state.IsEnabled, UpdatedAt = state.UpdatedAt });
+            else
+            {
+                stateRow.IsEnabled = state.IsEnabled;
+                stateRow.UpdatedAt = state.UpdatedAt;
+            }
         }
     }
 
@@ -50,14 +158,33 @@ internal sealed class FeatureFlagRepository(AppDbContext dbContext) : IFeatureFl
         key = exception.InnerException is PostgresException
         {
             SqlState: PostgresErrorCodes.UniqueViolation,
-            ConstraintName: FeatureFlagConfiguration.KeyIndexName
+            ConstraintName: FlagRowConfiguration.KeyIndexName
         }
             ? exception.Entries
                 .Select(entry => entry.Entity)
-                .OfType<FeatureFlag>()
+                .OfType<FlagRow>()
                 .FirstOrDefault()?.Key
             : null;
 
+        return key is not null;
+    }
+
+    private bool IsConcurrencyConflict(DbUpdateException exception, [NotNullWhen(true)] out FlagKey? key)
+    {
+        key = null;
+
+        if (exception.InnerException is not PostgresException { SqlState: PostgresErrorCodes.UniqueViolation, ConstraintName: "PK_flag_events" })
+            return false;
+
+        var conflictedFlagId = exception.Entries
+            .Select(entry => entry.Entity)
+            .OfType<FlagEventRecord>()
+            .FirstOrDefault()?.FlagId;
+
+        if (conflictedFlagId is null)
+            return false;
+
+        key = _tracked.FirstOrDefault(tracked => tracked.Flag.Id == conflictedFlagId).Flag?.Key;
         return key is not null;
     }
 }

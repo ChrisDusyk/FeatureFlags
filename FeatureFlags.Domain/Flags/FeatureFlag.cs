@@ -35,15 +35,6 @@ public sealed class FeatureFlag
         Description = null!;
     }
 
-    // EF Core materialization only. Goes away once the repository stops mapping this type
-    // directly to a table and reconstructs it from flag_events instead.
-    private FeatureFlag()
-    {
-        Key = null!;
-        Name = null!;
-        Description = null!;
-    }
-
     public Guid Id { get; private set; }
     public FlagKey Key { get; private set; }
     public string Name { get; private set; }
