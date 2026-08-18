@@ -14,6 +14,8 @@ namespace FeatureFlags.Infrastructure.Tests;
 [Collection(nameof(PostgresCollection))]
 public sealed class FeatureFlagRepositoryIdentityMapTests(PostgresFixture postgres)
 {
+    private static readonly Guid CausedBy = Guid.Parse("11111111-1111-1111-1111-111111111111");
+
     [Fact]
     public async Task GetByKeyAsync_CalledTwiceInTheSameScope_ShouldReturnTheSameInstance()
     {
@@ -24,7 +26,7 @@ public sealed class FeatureFlagRepositoryIdentityMapTests(PostgresFixture postgr
         await using var dbContext = postgres.NewDbContext();
         var repository = new FeatureFlagRepository(dbContext);
 
-        var flag = FeatureFlag.Create(key.Value, "Identity map test", null, [], now).Value;
+        var flag = FeatureFlag.Create(key.Value, "Identity map test", null, [], now, CausedBy).Value;
         await repository.AddAsync(flag, cancellationToken);
         Assert.True((await repository.SaveChangesAsync(cancellationToken)).IsSuccess);
 
@@ -46,7 +48,7 @@ public sealed class FeatureFlagRepositoryIdentityMapTests(PostgresFixture postgr
         await using var dbContext = postgres.NewDbContext();
         var repository = new FeatureFlagRepository(dbContext);
 
-        var seeded = FeatureFlag.Create(key.Value, "Identity map test", null, [], now).Value;
+        var seeded = FeatureFlag.Create(key.Value, "Identity map test", null, [], now, CausedBy).Value;
         await repository.AddAsync(seeded, cancellationToken);
         Assert.True((await repository.SaveChangesAsync(cancellationToken)).IsSuccess);
         var versionAfterSeed = seeded.Version;
@@ -57,7 +59,7 @@ public sealed class FeatureFlagRepositoryIdentityMapTests(PostgresFixture postgr
         var flag = (await repository.GetByKeyAsync(key, cancellationToken))
             .Match(f => f, () => throw new InvalidOperationException("Seed flag missing."));
 
-        flag.SetEnabled(EnvironmentKey.Production, isEnabled: true, now.AddMinutes(1));
+        flag.SetEnabled(EnvironmentKey.Production, isEnabled: true, now.AddMinutes(1), CausedBy);
 
         var result = await repository.SaveChangesAsync(cancellationToken);
 

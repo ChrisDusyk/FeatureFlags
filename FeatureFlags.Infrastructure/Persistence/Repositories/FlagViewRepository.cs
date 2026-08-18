@@ -1,5 +1,7 @@
 using FeatureFlags.Domain.Flags;
+using FeatureFlags.Domain.Flags.Events;
 using FeatureFlags.Domain.Shared;
+using FeatureFlags.Infrastructure.Persistence.Events;
 using FeatureFlags.Infrastructure.Persistence.ReadModels;
 using Microsoft.EntityFrameworkCore;
 
@@ -17,6 +19,24 @@ internal sealed class FlagViewRepository(AppDbContext dbContext) : IFlagViewRepo
             .FirstOrDefaultAsync(candidate => candidate.Key == key, cancellationToken);
 
         return row.ToOption().Map(ToView);
+    }
+
+    public async Task<IReadOnlyList<IFlagEvent>> GetHistoryAsync(FlagKey key, CancellationToken cancellationToken = default)
+    {
+        var flagId = await dbContext.FlagRows
+            .Where(row => row.Key == key)
+            .Select(row => (Guid?)row.Id)
+            .FirstOrDefaultAsync(cancellationToken);
+
+        if (flagId is null)
+            return [];
+
+        var records = await dbContext.FlagEvents
+            .Where(record => record.FlagId == flagId)
+            .OrderByDescending(record => record.SequenceNumber)
+            .ToListAsync(cancellationToken);
+
+        return [.. records.Select(FlagEventSerializer.ToEvent)];
     }
 
     private static FlagView ToView(FlagRow row) => new(

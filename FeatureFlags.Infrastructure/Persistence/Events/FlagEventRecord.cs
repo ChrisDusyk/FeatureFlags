@@ -14,8 +14,8 @@ internal sealed class FlagEventRecord
     /// concurrent writer into a Postgres unique-violation rather than a silent overwrite.</summary>
     public int SequenceNumber { get; set; }
 
-    /// <summary>"FlagCreated" or "FlagStateChanged" — the discriminator <see cref="FlagEventSerializer"/>
-    /// uses to pick which payload shape to deserialize.</summary>
+    /// <summary>"FlagCreated", "FlagStateChanged", or "FlagDetailsChanged" — the discriminator
+    /// <see cref="FlagEventSerializer"/> uses to pick which payload shape to deserialize.</summary>
     public string EventType { get; set; } = null!;
 
     /// <summary>Event-specific fields only — <see cref="FlagId"/> and <see cref="OccurredAt"/> are
@@ -23,4 +23,8 @@ internal sealed class FlagEventRecord
     public string Payload { get; set; } = null!;
 
     public DateTimeOffset OccurredAt { get; set; }
+
+    /// <summary>Who caused this. Null for rows the AddFlagEvents migration's backfill wrote —
+    /// there is no real actor to record for history that predates this column.</summary>
+    public Guid? CausedBy { get; set; }
 }

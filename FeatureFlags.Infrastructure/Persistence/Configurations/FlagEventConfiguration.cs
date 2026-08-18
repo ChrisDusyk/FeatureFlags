@@ -26,6 +26,9 @@ internal sealed class FlagEventConfiguration : IEntityTypeConfiguration<FlagEven
         builder.Property(record => record.OccurredAt)
             .IsRequired();
 
+        builder.Property(record => record.CausedBy)
+            .IsRequired(false);
+
         // Deliberately no FK to feature_flags: flag_events is the source of truth here, so the
         // dependency runs the other way — the read-model row is what depends on this stream, not
         // the reverse.
