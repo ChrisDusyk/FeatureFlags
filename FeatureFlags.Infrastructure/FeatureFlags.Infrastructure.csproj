@@ -12,6 +12,14 @@
     </PackageReference>
   </ItemGroup>
 
+  <!-- FeatureFlagRepositoryConcurrencyTests exercises the write-side repository directly, against
+       a real Postgres, to prove the concurrency-conflict path — a fake repository cannot. -->
+  <ItemGroup>
+    <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleTo">
+      <_Parameter1>FeatureFlags.Infrastructure.Tests</_Parameter1>
+    </AssemblyAttribute>
+  </ItemGroup>
+
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
