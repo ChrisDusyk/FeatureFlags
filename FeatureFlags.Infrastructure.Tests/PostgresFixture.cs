@@ -17,7 +17,10 @@ public sealed class PostgresFixture : IAsyncLifetime
 
     public async ValueTask InitializeAsync()
     {
-        _container = new PostgreSqlBuilder("postgres:18-alpine").Build();
+        // Matches the Postgres major version the deploy artifacts run
+        // (deploy/compose/docker-compose.yml, deploy/helm/featureflags/values.yaml) — a newer
+        // major here could pass while hiding an incompatibility with what a self-hoster actually runs.
+        _container = new PostgreSqlBuilder("postgres:17-alpine").Build();
         await _container.StartAsync();
 
         await using var dbContext = NewDbContext();
