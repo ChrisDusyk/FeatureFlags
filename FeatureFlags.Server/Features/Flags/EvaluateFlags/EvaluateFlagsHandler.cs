@@ -26,7 +26,7 @@ namespace FeatureFlags.Server.Features.Flags.EvaluateFlags;
 /// always the truth.
 /// </para>
 /// </summary>
-public sealed class EvaluateFlagsHandler(IFeatureFlagRepository repository, HybridCache cache)
+public sealed class EvaluateFlagsHandler(IFlagViewRepository repository, HybridCache cache)
 {
     /// <summary>
     /// Short enough that nobody reasons about it, long enough to absorb a fleet's poll. Invalidating
@@ -64,7 +64,7 @@ public sealed class EvaluateFlagsHandler(IFeatureFlagRepository repository, Hybr
     /// Builds the answer and the ETag together, from the same ordered pass, so the tag cannot
     /// describe a payload the caller did not get.
     /// </summary>
-    internal static EvaluatedFlags Evaluate(IReadOnlyList<FeatureFlag> flags, EnvironmentKey environment)
+    internal static EvaluatedFlags Evaluate(IReadOnlyList<FlagView> flags, EnvironmentKey environment)
     {
         // Ordered explicitly rather than relying on the repository's ordering: the ETag is only
         // meaningful if the same set of states always hashes the same way.

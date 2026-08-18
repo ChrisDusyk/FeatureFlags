@@ -86,25 +86,6 @@ internal sealed class FeatureFlagRepository(AppDbContext dbContext) : IFeatureFl
         return Result.Success();
     }
 
-    /// <summary>
-    /// Every flag, replayed from its own event stream. Transitional: the Server-layer read slices
-    /// still call this today, but they are moving to <see cref="IFlagViewRepository"/>, which reads
-    /// <see cref="FlagRow"/> directly instead of replaying history for a listing.
-    /// </summary>
-    // TODO(event-sourcing-pr3): remove once IFeatureFlagRepository.ListAsync has no more callers.
-    public async Task<IReadOnlyList<FeatureFlag>> ListAsync(CancellationToken cancellationToken = default)
-    {
-        var rows = await dbContext.FlagRows
-            .OrderBy(row => row.Key)
-            .ToListAsync(cancellationToken);
-
-        var flags = new List<FeatureFlag>(rows.Count);
-        foreach (var row in rows)
-            flags.Add(await RehydrateAsync(row, cancellationToken));
-
-        return flags;
-    }
-
     private async Task<FeatureFlag> RehydrateAsync(FlagRow row, CancellationToken cancellationToken)
     {
         var records = await dbContext.FlagEvents

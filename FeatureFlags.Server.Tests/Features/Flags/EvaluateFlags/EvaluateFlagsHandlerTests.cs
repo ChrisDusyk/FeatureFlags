@@ -11,7 +11,7 @@ public class EvaluateFlagsHandlerTests
 {
     private static readonly DateTimeOffset Now = new(2026, 8, 7, 12, 0, 0, TimeSpan.Zero);
 
-    private readonly FakeFeatureFlagRepository _repository = new();
+    private readonly FakeFlagViewRepository _repository = new();
 
     /// <summary>
     /// A fresh cache per handler, so a test that wants to see a change reaches for a new one rather
@@ -24,8 +24,23 @@ public class EvaluateFlagsHandlerTests
             .BuildServiceProvider()
             .GetRequiredService<HybridCache>());
 
-    private void Seed(string key, params EnvironmentKey[] enabledIn) =>
-        _repository.Seed(FeatureFlag.Create(key, key, null, enabledIn, Now).Value);
+    private FlagView Seed(string key, params EnvironmentKey[] enabledIn)
+    {
+        var flagKey = FlagKey.Create(key).Value;
+        var enabled = enabledIn.ToHashSet();
+
+        var view = new FlagView(
+            Guid.CreateVersion7(),
+            flagKey,
+            key,
+            string.Empty,
+            Now,
+            Now,
+            [.. EnvironmentKey.All.Select(environment => new FlagStateView(environment, enabled.Contains(environment), Now))]);
+
+        _repository.Seed(view);
+        return view;
+    }
 
     private async Task<EvaluatedFlags> EvaluateAsync(EnvironmentKey environment) =>
         (await CreateSut().HandleAsync(
@@ -97,11 +112,11 @@ public class EvaluateFlagsHandlerTests
     [Fact]
     public async Task HandleAsync_AfterAFlagIsToggled_ShouldReturnADifferentETag()
     {
-        Seed("new-checkout", EnvironmentKey.Development);
+        var flag = Seed("new-checkout", EnvironmentKey.Development);
 
         var before = await EvaluateAsync(EnvironmentKey.Development);
 
-        _repository.Committed.Single().SetEnabled(EnvironmentKey.Development, false, Now.AddHours(1));
+        _repository.SetEnabled(flag.Key, EnvironmentKey.Development, false, Now.AddHours(1));
 
         var after = await EvaluateAsync(EnvironmentKey.Development);
 
@@ -140,7 +155,7 @@ public class EvaluateFlagsHandlerTests
     [Fact]
     public async Task HandleAsync_ShouldServeARepeatedCallFromTheCache()
     {
-        Seed("new-checkout", EnvironmentKey.Development);
+        var flag = Seed("new-checkout", EnvironmentKey.Development);
 
         var handler = CreateSut();
         var query = new EvaluateFlagsQuery(EnvironmentKey.Development);
@@ -149,7 +164,7 @@ public class EvaluateFlagsHandlerTests
 
         // Changing the flags behind the handler's back: the cached answer is the one that proves
         // the second call did not reach the repository.
-        _repository.Committed.Single().SetEnabled(EnvironmentKey.Development, false, Now.AddHours(1));
+        _repository.SetEnabled(flag.Key, EnvironmentKey.Development, false, Now.AddHours(1));
 
         var second = await handler.HandleAsync(query, TestContext.Current.CancellationToken);
 

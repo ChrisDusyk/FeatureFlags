@@ -130,6 +130,25 @@ public class ToggleFlagHandlerTests
     }
 
     [Fact]
+    public async Task HandleAsync_WhenSaveReportsAConcurrencyConflict_ShouldReturnConflict()
+    {
+        // Two request-scoped repositories reading the same flag's event stream at the same version
+        // is a real race under event sourcing, not a fake-only case — FeatureFlagRepositoryConcurrencyTests
+        // proves the store actually produces this; this proves the handler forwards it correctly.
+        var key = Key("new-checkout");
+        Seed(Nowhere);
+        _repository.FailNextSaveWith(FlagErrors.ConcurrencyConflict(key));
+
+        var result = await CreateSut().HandleAsync(
+            new ToggleFlagCommand(key, EnvironmentKey.Production, IsEnabled: true),
+            TestContext.Current.CancellationToken);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal(ErrorType.Conflict, result.Error.Type);
+        Assert.Equal("Flag.ConcurrencyConflict", result.Error.Code);
+    }
+
+    [Fact]
     public async Task HandleAsync_ShouldNotTouchTheFlagsOwnUpdatedAt()
     {
         var flag = Seed(Nowhere);
