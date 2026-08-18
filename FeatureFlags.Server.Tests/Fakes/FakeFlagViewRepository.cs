@@ -1,5 +1,6 @@
 using FeatureFlags.Domain.Environments;
 using FeatureFlags.Domain.Flags;
+using FeatureFlags.Domain.Flags.Events;
 using FeatureFlags.Domain.Shared;
 
 namespace FeatureFlags.Server.Tests.Fakes;
@@ -13,8 +14,13 @@ namespace FeatureFlags.Server.Tests.Fakes;
 internal sealed class FakeFlagViewRepository : IFlagViewRepository
 {
     private readonly Dictionary<FlagKey, FlagView> _views = [];
+    private readonly Dictionary<FlagKey, List<IFlagEvent>> _histories = [];
 
     public void Seed(FlagView view) => _views[view.Key] = view;
+
+    /// <summary>Sets the events <see cref="GetHistoryAsync"/> returns for a key, newest first —
+    /// matching what the real repository returns from its <c>ORDER BY SequenceNumber DESC</c>.</summary>
+    public void SeedHistory(FlagKey key, params IFlagEvent[] events) => _histories[key] = [.. events];
 
     public void SetEnabled(FlagKey key, EnvironmentKey environment, bool isEnabled, DateTimeOffset updatedAt)
     {
@@ -37,4 +43,8 @@ internal sealed class FakeFlagViewRepository : IFlagViewRepository
         Task.FromResult(_views.TryGetValue(key, out var view)
             ? Option<FlagView>.Some(view)
             : Option<FlagView>.None);
+
+    public Task<IReadOnlyList<IFlagEvent>> GetHistoryAsync(FlagKey key, CancellationToken cancellationToken = default) =>
+        Task.FromResult<IReadOnlyList<IFlagEvent>>(
+            _histories.TryGetValue(key, out var events) ? events : []);
 }

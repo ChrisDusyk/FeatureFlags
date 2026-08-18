@@ -1,5 +1,7 @@
+using System.Security.Claims;
 using FeatureFlags.Domain.Environments;
 using FeatureFlags.Domain.Shared;
+using FeatureFlags.Domain.Users;
 using FeatureFlags.Server.Api;
 
 namespace FeatureFlags.Server.Features.Flags.CreateFlag;
@@ -10,6 +12,7 @@ public static class CreateFlagEndpoint
     {
         endpoints.MapPost("/flags", async (
             CreateFlagRequest request,
+            ClaimsPrincipal principal,
             CreateFlagHandler handler,
             CancellationToken cancellationToken) =>
         {
@@ -29,7 +32,14 @@ public static class CreateFlagEndpoint
                 enabledIn.Add(environmentResult.Value);
             }
 
-            var command = new CreateFlagCommand(request.Key, request.Name, request.Description, enabledIn);
+            var causedBy = principal.GetUserId().ToResult(UserErrors.NotProvisioned);
+
+            if (causedBy.IsFailure)
+            {
+                return causedBy.Error.ToProblem();
+            }
+
+            var command = new CreateFlagCommand(request.Key, request.Name, request.Description, enabledIn, causedBy.Value);
 
             var result = await handler.HandleAsync(command, cancellationToken);
 

@@ -11,6 +11,8 @@ public class ToggleFlagHandlerTests
 {
     private static readonly DateTimeOffset Now = new(2026, 7, 31, 12, 0, 0, TimeSpan.Zero);
 
+    private static readonly Guid CausedBy = Guid.Parse("11111111-1111-1111-1111-111111111111");
+
     private static readonly EnvironmentKey[] Nowhere = [];
 
     private readonly FakeFeatureFlagRepository _repository = new();
@@ -22,7 +24,7 @@ public class ToggleFlagHandlerTests
 
     private FeatureFlag Seed(params EnvironmentKey[] enabledIn)
     {
-        var flag = FeatureFlag.Create("new-checkout", "New checkout", null, enabledIn, Now).Value;
+        var flag = FeatureFlag.Create("new-checkout", "New checkout", null, enabledIn, Now, CausedBy).Value;
         _repository.Seed(flag);
 
         return flag;
@@ -35,7 +37,7 @@ public class ToggleFlagHandlerTests
         _timeProvider.SetUtcNow(Now.AddHours(1));
 
         var result = await CreateSut().HandleAsync(
-            new ToggleFlagCommand(Key("new-checkout"), EnvironmentKey.Production, IsEnabled: true),
+            new ToggleFlagCommand(Key("new-checkout"), EnvironmentKey.Production, IsEnabled: true, CausedBy),
             TestContext.Current.CancellationToken);
 
         Assert.True(result.IsSuccess);
@@ -52,7 +54,7 @@ public class ToggleFlagHandlerTests
         var flag = Seed(EnvironmentKey.Development);
 
         var result = await CreateSut().HandleAsync(
-            new ToggleFlagCommand(Key("new-checkout"), EnvironmentKey.Development, IsEnabled: false),
+            new ToggleFlagCommand(Key("new-checkout"), EnvironmentKey.Development, IsEnabled: false, CausedBy),
             TestContext.Current.CancellationToken);
 
         Assert.True(result.IsSuccess);
@@ -66,7 +68,7 @@ public class ToggleFlagHandlerTests
         var flag = Seed(Nowhere);
 
         await CreateSut().HandleAsync(
-            new ToggleFlagCommand(Key("new-checkout"), EnvironmentKey.Production, IsEnabled: true),
+            new ToggleFlagCommand(Key("new-checkout"), EnvironmentKey.Production, IsEnabled: true, CausedBy),
             TestContext.Current.CancellationToken);
 
         Assert.False(flag.IsEnabledIn(EnvironmentKey.Development));
@@ -79,7 +81,7 @@ public class ToggleFlagHandlerTests
         // The point of PUT-ing the state rather than POST-ing a flip: a retried request after a
         // dropped response must not turn the flag back off.
         var flag = Seed(Nowhere);
-        var command = new ToggleFlagCommand(Key("new-checkout"), EnvironmentKey.Production, IsEnabled: true);
+        var command = new ToggleFlagCommand(Key("new-checkout"), EnvironmentKey.Production, IsEnabled: true, CausedBy);
 
         await CreateSut().HandleAsync(command, TestContext.Current.CancellationToken);
         var second = await CreateSut().HandleAsync(command, TestContext.Current.CancellationToken);
@@ -96,7 +98,7 @@ public class ToggleFlagHandlerTests
         _timeProvider.SetUtcNow(Now.AddHours(1));
 
         var result = await CreateSut().HandleAsync(
-            new ToggleFlagCommand(Key("new-checkout"), EnvironmentKey.Development, IsEnabled: true),
+            new ToggleFlagCommand(Key("new-checkout"), EnvironmentKey.Development, IsEnabled: true, CausedBy),
             TestContext.Current.CancellationToken);
 
         Assert.Equal(Now, result.Value.UpdatedAt);
@@ -106,7 +108,7 @@ public class ToggleFlagHandlerTests
     public async Task HandleAsync_WithAnUnknownKey_ShouldReturnNotFoundAndNotPersist()
     {
         var result = await CreateSut().HandleAsync(
-            new ToggleFlagCommand(Key("nothing-here"), EnvironmentKey.Development, IsEnabled: true),
+            new ToggleFlagCommand(Key("nothing-here"), EnvironmentKey.Development, IsEnabled: true, CausedBy),
             TestContext.Current.CancellationToken);
 
         Assert.True(result.IsFailure);
@@ -122,7 +124,7 @@ public class ToggleFlagHandlerTests
         _repository.FailNextSaveWith(Error.Failure("Store.Unavailable", "The store did not accept the write."));
 
         var result = await CreateSut().HandleAsync(
-            new ToggleFlagCommand(Key("new-checkout"), EnvironmentKey.Production, IsEnabled: true),
+            new ToggleFlagCommand(Key("new-checkout"), EnvironmentKey.Production, IsEnabled: true, CausedBy),
             TestContext.Current.CancellationToken);
 
         Assert.True(result.IsFailure);
@@ -140,7 +142,7 @@ public class ToggleFlagHandlerTests
         _repository.FailNextSaveWith(FlagErrors.ConcurrencyConflict(key));
 
         var result = await CreateSut().HandleAsync(
-            new ToggleFlagCommand(key, EnvironmentKey.Production, IsEnabled: true),
+            new ToggleFlagCommand(key, EnvironmentKey.Production, IsEnabled: true, CausedBy),
             TestContext.Current.CancellationToken);
 
         Assert.True(result.IsFailure);
@@ -155,7 +157,7 @@ public class ToggleFlagHandlerTests
         _timeProvider.SetUtcNow(Now.AddDays(2));
 
         await CreateSut().HandleAsync(
-            new ToggleFlagCommand(Key("new-checkout"), EnvironmentKey.Production, IsEnabled: true),
+            new ToggleFlagCommand(Key("new-checkout"), EnvironmentKey.Production, IsEnabled: true, CausedBy),
             TestContext.Current.CancellationToken);
 
         Assert.Equal(Now, flag.UpdatedAt);

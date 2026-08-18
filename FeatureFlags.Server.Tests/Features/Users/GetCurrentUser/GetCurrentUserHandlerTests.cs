@@ -1,6 +1,7 @@
 using FeatureFlags.Domain.Shared;
 using FeatureFlags.Domain.Users;
 using FeatureFlags.Server.Features.Users.GetCurrentUser;
+using FeatureFlags.Server.Tests.Fakes;
 
 namespace FeatureFlags.Server.Tests.Features.Users.GetCurrentUser;
 
