@@ -27,6 +27,12 @@ public sealed class FeatureFlag
     private readonly List<FlagState> _states = [];
     private readonly List<IFlagEvent> _uncommittedEvents = [];
 
+    // IDE0032 suggests an auto property here, which would leave a settable int for EF to pick up
+    // by convention if this type is ever queried again — see the Version property below.
+#pragma warning disable IDE0032
+    private int _version;
+#pragma warning restore IDE0032
+
     private FeatureFlag(Guid id)
     {
         Id = id;
@@ -51,11 +57,16 @@ public sealed class FeatureFlag
     public IReadOnlyCollection<FlagState> States => _states;
 
     /// <summary>How many events have been applied to this instance, fresh or replayed — its place
-    /// in its own stream.</summary>
-    public int Version { get; private set; }
+    /// in its own stream. Getter-only and backed by a field, not an auto-property, so EF's
+    /// by-convention mapping has no settable scalar to pick up if this type is ever queried again.</summary>
+    public int Version => _version;
 
-    /// <summary>Events raised since this instance was created or rehydrated, not yet appended.</summary>
-    public IReadOnlyList<IFlagEvent> UncommittedEvents => _uncommittedEvents;
+    /// <summary>
+    /// Events raised since this instance was created or rehydrated, not yet appended. Wrapped
+    /// rather than returning <c>_uncommittedEvents</c> itself, so a caller cannot cast back to
+    /// <see cref="List{T}"/> and mutate or clear it out from under the aggregate.
+    /// </summary>
+    public IReadOnlyList<IFlagEvent> UncommittedEvents => _uncommittedEvents.AsReadOnly();
 
     /// <summary>
     /// Creates a flag in every environment at once. It is on only where <paramref name="enabledIn"/>
@@ -96,16 +107,31 @@ public sealed class FeatureFlag
     }
 
     /// <summary>
-    /// Rebuilds a flag by folding its full event history in order — no validation, since every
-    /// event already happened. The result carries no uncommitted events: replaying history is not
-    /// the same as making it.
+    /// Rebuilds a flag by folding its full event history in order — no business validation, since
+    /// every event already happened. The result carries no uncommitted events: replaying history is
+    /// not the same as making it.
     /// </summary>
+    /// <exception cref="InvalidOperationException">
+    /// The stream belongs to a different flag, or its first event is not a <see cref="FlagCreatedEvent"/>.
+    /// Both mean the repository handed this a corrupted or mismatched stream — a store bug, not
+    /// something a caller can recover from, so this fails loudly rather than returning a flag with
+    /// null required fields.
+    /// </exception>
     public static FeatureFlag Rehydrate(Guid id, IEnumerable<IFlagEvent> events)
     {
         var flag = new FeatureFlag(id);
 
         foreach (var @event in events)
+        {
+            if (@event.FlagId != id)
+                throw new InvalidOperationException(
+                    $"Cannot rehydrate flag {id}: encountered an event for flag {@event.FlagId}.");
+
             flag.Apply(@event);
+        }
+
+        if (flag.Key is null)
+            throw new InvalidOperationException($"Cannot rehydrate flag {id}: its stream contains no FlagCreatedEvent.");
 
         return flag;
     }
@@ -166,8 +192,14 @@ public sealed class FeatureFlag
                 else
                     existing.Apply(stateChanged.IsEnabled, stateChanged.OccurredAt);
                 break;
+
+            // An event type this build does not know about is a corrupted or forward-incompatible
+            // stream, not a fact to skip — folding it silently would advance Version past a dropped
+            // change and hand back an aggregate that looks consistent but is not.
+            default:
+                throw new InvalidOperationException($"Unrecognized flag event type '{@event.GetType()}' on flag {Id}.");
         }
 
-        Version++;
+        _version++;
     }
 }

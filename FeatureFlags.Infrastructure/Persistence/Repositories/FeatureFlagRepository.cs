@@ -22,6 +22,14 @@ internal sealed class FeatureFlagRepository(AppDbContext dbContext) : IFeatureFl
 
     public async Task<Option<FeatureFlag>> GetByKeyAsync(FlagKey key, CancellationToken cancellationToken = default)
     {
+        // A repeat read within the same scope returns the same instance rather than rehydrating a
+        // second one: two aggregates for one row would each think they own the next sequence
+        // number, and saving both would append overlapping (FlagId, SequenceNumber) ranges — a
+        // self-inflicted concurrency conflict, not a real one.
+        var tracked = _tracked.FirstOrDefault(entry => entry.Row.Key == key).Flag;
+        if (tracked is not null)
+            return Option<FeatureFlag>.Some(tracked);
+
         var row = await dbContext.FlagRows
             .FirstOrDefaultAsync(candidate => candidate.Key == key, cancellationToken);
 
@@ -86,6 +94,11 @@ internal sealed class FeatureFlagRepository(AppDbContext dbContext) : IFeatureFl
         return Result.Success();
     }
 
+    /// <summary>
+    /// Rehydrates <paramref name="row"/>'s flag and starts tracking it. Callers check the identity
+    /// map themselves first — this method only ever adds a new entry, never looks one up — so it
+    /// stays the one place <c>_tracked</c> grows.
+    /// </summary>
     private async Task<FeatureFlag> RehydrateAsync(FlagRow row, CancellationToken cancellationToken)
     {
         var records = await dbContext.FlagEvents
