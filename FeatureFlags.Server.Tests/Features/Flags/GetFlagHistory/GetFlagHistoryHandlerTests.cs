@@ -19,13 +19,11 @@ public class GetFlagHistoryHandlerTests
 
     private GetFlagHistoryHandler CreateSut() => new(_viewRepository, _userRepository);
 
-    private FlagKey SeedFlag(string key = "new-checkout")
+    private FlagView SeedFlag(string key = "new-checkout")
     {
-        var flagKey = FlagKey.Create(key).Value;
-
         var view = new FlagView(
             Guid.CreateVersion7(),
-            flagKey,
+            FlagKey.Create(key).Value,
             "New checkout",
             string.Empty,
             Now,
@@ -33,7 +31,7 @@ public class GetFlagHistoryHandlerTests
             [.. EnvironmentKey.All.Select(environment => new FlagStateView(environment, false, Now))]);
 
         _viewRepository.Seed(view);
-        return flagKey;
+        return view;
     }
 
     [Fact]
@@ -51,9 +49,9 @@ public class GetFlagHistoryHandlerTests
     [Fact]
     public async Task HandleAsync_WithNoHistory_ShouldReturnAnEmptyList()
     {
-        var key = SeedFlag();
+        var flag = SeedFlag();
 
-        var result = await CreateSut().HandleAsync(new GetFlagHistoryQuery(key), TestContext.Current.CancellationToken);
+        var result = await CreateSut().HandleAsync(new GetFlagHistoryQuery(flag.Key), TestContext.Current.CancellationToken);
 
         Assert.True(result.IsSuccess);
         Assert.Empty(result.Value.Entries);
@@ -62,11 +60,11 @@ public class GetFlagHistoryHandlerTests
     [Fact]
     public async Task HandleAsync_ShouldResolveTheActorsNameFromTheUserMirror()
     {
-        var key = SeedFlag();
+        var flag = SeedFlag();
         _userRepository.Seed(User.FromPersisted(Ada, "ada@example.com", "Ada Lovelace", UserRole.User, Now, Now));
-        _viewRepository.SeedHistory(key, new FlagCreatedEvent(Guid.CreateVersion7(), key, "New checkout", "", Now, Ada));
+        _viewRepository.SeedHistory(flag.Id, new FlagCreatedEvent(flag.Id, flag.Key, "New checkout", "", Now, Ada));
 
-        var result = await CreateSut().HandleAsync(new GetFlagHistoryQuery(key), TestContext.Current.CancellationToken);
+        var result = await CreateSut().HandleAsync(new GetFlagHistoryQuery(flag.Key), TestContext.Current.CancellationToken);
 
         Assert.Equal("Ada Lovelace", Assert.Single(result.Value.Entries).CausedByName);
     }
@@ -74,11 +72,11 @@ public class GetFlagHistoryHandlerTests
     [Fact]
     public async Task HandleAsync_WhenTheUserHasNoDisplayName_ShouldFallBackToEmail()
     {
-        var key = SeedFlag();
+        var flag = SeedFlag();
         _userRepository.Seed(User.FromPersisted(Ada, "ada@example.com", "", UserRole.User, Now, Now));
-        _viewRepository.SeedHistory(key, new FlagCreatedEvent(Guid.CreateVersion7(), key, "New checkout", "", Now, Ada));
+        _viewRepository.SeedHistory(flag.Id, new FlagCreatedEvent(flag.Id, flag.Key, "New checkout", "", Now, Ada));
 
-        var result = await CreateSut().HandleAsync(new GetFlagHistoryQuery(key), TestContext.Current.CancellationToken);
+        var result = await CreateSut().HandleAsync(new GetFlagHistoryQuery(flag.Key), TestContext.Current.CancellationToken);
 
         Assert.Equal("ada@example.com", Assert.Single(result.Value.Entries).CausedByName);
     }
@@ -87,10 +85,10 @@ public class GetFlagHistoryHandlerTests
     public async Task HandleAsync_WhenAnEventHasNoCausedBy_ShouldReportNoName()
     {
         // A backfilled, pre-attribution event — the migration's lossy backfill leaves these null.
-        var key = SeedFlag();
-        _viewRepository.SeedHistory(key, new FlagCreatedEvent(Guid.CreateVersion7(), key, "New checkout", "", Now, null));
+        var flag = SeedFlag();
+        _viewRepository.SeedHistory(flag.Id, new FlagCreatedEvent(flag.Id, flag.Key, "New checkout", "", Now, null));
 
-        var result = await CreateSut().HandleAsync(new GetFlagHistoryQuery(key), TestContext.Current.CancellationToken);
+        var result = await CreateSut().HandleAsync(new GetFlagHistoryQuery(flag.Key), TestContext.Current.CancellationToken);
 
         Assert.Null(Assert.Single(result.Value.Entries).CausedByName);
     }
@@ -98,10 +96,10 @@ public class GetFlagHistoryHandlerTests
     [Fact]
     public async Task HandleAsync_WhenTheCausedByUserNoLongerExists_ShouldReportNoName()
     {
-        var key = SeedFlag();
-        _viewRepository.SeedHistory(key, new FlagCreatedEvent(Guid.CreateVersion7(), key, "New checkout", "", Now, Ada));
+        var flag = SeedFlag();
+        _viewRepository.SeedHistory(flag.Id, new FlagCreatedEvent(flag.Id, flag.Key, "New checkout", "", Now, Ada));
 
-        var result = await CreateSut().HandleAsync(new GetFlagHistoryQuery(key), TestContext.Current.CancellationToken);
+        var result = await CreateSut().HandleAsync(new GetFlagHistoryQuery(flag.Key), TestContext.Current.CancellationToken);
 
         Assert.Null(Assert.Single(result.Value.Entries).CausedByName);
     }
@@ -109,16 +107,15 @@ public class GetFlagHistoryHandlerTests
     [Fact]
     public async Task HandleAsync_ShouldResolveEachDistinctActorOnlyOnce()
     {
-        var key = SeedFlag();
-        var flagId = Guid.CreateVersion7();
+        var flag = SeedFlag();
         _userRepository.Seed(User.FromPersisted(Ada, "ada@example.com", "Ada Lovelace", UserRole.User, Now, Now));
         _viewRepository.SeedHistory(
-            key,
-            new FlagStateChangedEvent(flagId, EnvironmentKey.Staging, true, Now.AddHours(2), Ada),
-            new FlagStateChangedEvent(flagId, EnvironmentKey.Development, true, Now.AddHours(1), Ada),
-            new FlagCreatedEvent(flagId, key, "New checkout", "", Now, Ada));
+            flag.Id,
+            new FlagStateChangedEvent(flag.Id, EnvironmentKey.Staging, true, Now.AddHours(2), Ada),
+            new FlagStateChangedEvent(flag.Id, EnvironmentKey.Development, true, Now.AddHours(1), Ada),
+            new FlagCreatedEvent(flag.Id, flag.Key, "New checkout", "", Now, Ada));
 
-        var result = await CreateSut().HandleAsync(new GetFlagHistoryQuery(key), TestContext.Current.CancellationToken);
+        var result = await CreateSut().HandleAsync(new GetFlagHistoryQuery(flag.Key), TestContext.Current.CancellationToken);
 
         Assert.All(result.Value.Entries, entry => Assert.Equal("Ada Lovelace", entry.CausedByName));
     }
@@ -126,11 +123,10 @@ public class GetFlagHistoryHandlerTests
     [Fact]
     public async Task HandleAsync_ShouldMapAFlagCreatedEventWithItsNameAndDescription()
     {
-        var key = SeedFlag();
-        var flagId = Guid.CreateVersion7();
-        _viewRepository.SeedHistory(key, new FlagCreatedEvent(flagId, key, "New checkout", "Notes.", Now, null));
+        var flag = SeedFlag();
+        _viewRepository.SeedHistory(flag.Id, new FlagCreatedEvent(flag.Id, flag.Key, "New checkout", "Notes.", Now, null));
 
-        var result = await CreateSut().HandleAsync(new GetFlagHistoryQuery(key), TestContext.Current.CancellationToken);
+        var result = await CreateSut().HandleAsync(new GetFlagHistoryQuery(flag.Key), TestContext.Current.CancellationToken);
 
         var entry = Assert.Single(result.Value.Entries);
         Assert.Equal("FlagCreated", entry.EventType);
@@ -144,11 +140,10 @@ public class GetFlagHistoryHandlerTests
     [Fact]
     public async Task HandleAsync_ShouldMapAFlagDetailsChangedEventWithItsNameAndDescription()
     {
-        var key = SeedFlag();
-        var flagId = Guid.CreateVersion7();
-        _viewRepository.SeedHistory(key, new FlagDetailsChangedEvent(flagId, "Renamed", "New notes.", Now, null));
+        var flag = SeedFlag();
+        _viewRepository.SeedHistory(flag.Id, new FlagDetailsChangedEvent(flag.Id, "Renamed", "New notes.", Now, null));
 
-        var result = await CreateSut().HandleAsync(new GetFlagHistoryQuery(key), TestContext.Current.CancellationToken);
+        var result = await CreateSut().HandleAsync(new GetFlagHistoryQuery(flag.Key), TestContext.Current.CancellationToken);
 
         var entry = Assert.Single(result.Value.Entries);
         Assert.Equal("FlagDetailsChanged", entry.EventType);
@@ -161,11 +156,10 @@ public class GetFlagHistoryHandlerTests
     [Fact]
     public async Task HandleAsync_ShouldMapAFlagStateChangedEventWithItsEnvironmentAndState()
     {
-        var key = SeedFlag();
-        var flagId = Guid.CreateVersion7();
-        _viewRepository.SeedHistory(key, new FlagStateChangedEvent(flagId, EnvironmentKey.Production, true, Now, null));
+        var flag = SeedFlag();
+        _viewRepository.SeedHistory(flag.Id, new FlagStateChangedEvent(flag.Id, EnvironmentKey.Production, true, Now, null));
 
-        var result = await CreateSut().HandleAsync(new GetFlagHistoryQuery(key), TestContext.Current.CancellationToken);
+        var result = await CreateSut().HandleAsync(new GetFlagHistoryQuery(flag.Key), TestContext.Current.CancellationToken);
 
         var entry = Assert.Single(result.Value.Entries);
         Assert.Equal("FlagStateChanged", entry.EventType);
@@ -180,15 +174,14 @@ public class GetFlagHistoryHandlerTests
     {
         // The fake, like the real repository, hands back events in whatever order it was seeded
         // with — the handler must not reorder them, since "newest first" is the repository's job.
-        var key = SeedFlag();
-        var flagId = Guid.CreateVersion7();
+        var flag = SeedFlag();
         _viewRepository.SeedHistory(
-            key,
-            new FlagStateChangedEvent(flagId, EnvironmentKey.Production, true, Now.AddHours(2), null),
-            new FlagStateChangedEvent(flagId, EnvironmentKey.Staging, true, Now.AddHours(1), null),
-            new FlagCreatedEvent(flagId, key, "New checkout", "", Now, null));
+            flag.Id,
+            new FlagStateChangedEvent(flag.Id, EnvironmentKey.Production, true, Now.AddHours(2), null),
+            new FlagStateChangedEvent(flag.Id, EnvironmentKey.Staging, true, Now.AddHours(1), null),
+            new FlagCreatedEvent(flag.Id, flag.Key, "New checkout", "", Now, null));
 
-        var result = await CreateSut().HandleAsync(new GetFlagHistoryQuery(key), TestContext.Current.CancellationToken);
+        var result = await CreateSut().HandleAsync(new GetFlagHistoryQuery(flag.Key), TestContext.Current.CancellationToken);
 
         Assert.Equal(
             ["FlagStateChanged", "FlagStateChanged", "FlagCreated"],

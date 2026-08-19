@@ -90,10 +90,7 @@ export function FlagRow({
         aria-checked={flag.isEnabled}
         aria-label={`${flag.name} in ${environment.name}`}
         disabled={pending}
-        onClick={(event) => {
-          event.stopPropagation();
-          void toggle();
-        }}
+        onClick={() => void toggle()}
       >
         <span className="switch__track" aria-hidden="true">
           <span className="switch__thumb" />

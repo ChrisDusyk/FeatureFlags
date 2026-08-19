@@ -21,4 +21,7 @@ internal sealed class FakeUserRepository : IUserRepository
         Task.FromResult(_users.TryGetValue(id, out var user)
             ? Option<User>.Some(user)
             : Option<User>.None);
+
+    public Task<IReadOnlyList<User>> GetByIdsAsync(IReadOnlyCollection<Guid> ids, CancellationToken cancellationToken = default) =>
+        Task.FromResult<IReadOnlyList<User>>([.. ids.Where(_users.ContainsKey).Select(id => _users[id])]);
 }

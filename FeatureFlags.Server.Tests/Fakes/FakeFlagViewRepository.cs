@@ -14,13 +14,13 @@ namespace FeatureFlags.Server.Tests.Fakes;
 internal sealed class FakeFlagViewRepository : IFlagViewRepository
 {
     private readonly Dictionary<FlagKey, FlagView> _views = [];
-    private readonly Dictionary<FlagKey, List<IFlagEvent>> _histories = [];
+    private readonly Dictionary<Guid, List<IFlagEvent>> _histories = [];
 
     public void Seed(FlagView view) => _views[view.Key] = view;
 
-    /// <summary>Sets the events <see cref="GetHistoryAsync"/> returns for a key, newest first —
+    /// <summary>Sets the events <see cref="GetHistoryAsync"/> returns for a flag id, newest first —
     /// matching what the real repository returns from its <c>ORDER BY SequenceNumber DESC</c>.</summary>
-    public void SeedHistory(FlagKey key, params IFlagEvent[] events) => _histories[key] = [.. events];
+    public void SeedHistory(Guid flagId, params IFlagEvent[] events) => _histories[flagId] = [.. events];
 
     public void SetEnabled(FlagKey key, EnvironmentKey environment, bool isEnabled, DateTimeOffset updatedAt)
     {
@@ -44,7 +44,7 @@ internal sealed class FakeFlagViewRepository : IFlagViewRepository
             ? Option<FlagView>.Some(view)
             : Option<FlagView>.None);
 
-    public Task<IReadOnlyList<IFlagEvent>> GetHistoryAsync(FlagKey key, CancellationToken cancellationToken = default) =>
+    public Task<IReadOnlyList<IFlagEvent>> GetHistoryAsync(Guid flagId, CancellationToken cancellationToken = default) =>
         Task.FromResult<IReadOnlyList<IFlagEvent>>(
-            _histories.TryGetValue(key, out var events) ? events : []);
+            _histories.TryGetValue(flagId, out var events) ? events : []);
 }

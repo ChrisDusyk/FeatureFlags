@@ -21,16 +21,8 @@ internal sealed class FlagViewRepository(AppDbContext dbContext) : IFlagViewRepo
         return row.ToOption().Map(ToView);
     }
 
-    public async Task<IReadOnlyList<IFlagEvent>> GetHistoryAsync(FlagKey key, CancellationToken cancellationToken = default)
+    public async Task<IReadOnlyList<IFlagEvent>> GetHistoryAsync(Guid flagId, CancellationToken cancellationToken = default)
     {
-        var flagId = await dbContext.FlagRows
-            .Where(row => row.Key == key)
-            .Select(row => (Guid?)row.Id)
-            .FirstOrDefaultAsync(cancellationToken);
-
-        if (flagId is null)
-            return [];
-
         var records = await dbContext.FlagEvents
             .Where(record => record.FlagId == flagId)
             .OrderByDescending(record => record.SequenceNumber)

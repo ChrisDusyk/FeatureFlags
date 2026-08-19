@@ -14,4 +14,15 @@ internal sealed class UserRepository(AppDbContext dbContext) : IUserRepository
 
         return user.ToOption();
     }
+
+    public async Task<IReadOnlyList<User>> GetByIdsAsync(IReadOnlyCollection<Guid> ids, CancellationToken cancellationToken = default)
+    {
+        if (ids.Count == 0)
+            return [];
+
+        return await dbContext.Users
+            .AsNoTracking()
+            .Where(candidate => ids.Contains(candidate.Id))
+            .ToListAsync(cancellationToken);
+    }
 }
