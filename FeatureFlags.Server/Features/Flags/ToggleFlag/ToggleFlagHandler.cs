@@ -17,7 +17,7 @@ public sealed class ToggleFlagHandler(IFeatureFlagRepository repository, TimePro
 
         var flag = flagResult.Value;
 
-        var setResult = flag.SetEnabled(command.Environment, command.IsEnabled, timeProvider.GetUtcNow());
+        var setResult = flag.SetEnabled(command.Environment, command.IsEnabled, timeProvider.GetUtcNow(), command.CausedBy);
         if (setResult.IsFailure)
             return Result.Failure<ToggleFlagResponse>(setResult.Error);
 

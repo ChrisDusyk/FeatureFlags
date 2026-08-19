@@ -14,7 +14,8 @@ public sealed class CreateFlagHandler(IFeatureFlagRepository repository, TimePro
             command.Name,
             command.Description,
             command.EnabledIn,
-            timeProvider.GetUtcNow());
+            timeProvider.GetUtcNow(),
+            command.CausedBy);
 
         if (flagResult.IsFailure)
             return Result.Failure<CreateFlagResponse>(flagResult.Error);

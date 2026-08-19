@@ -11,7 +11,8 @@ public sealed record CreateFlagCommand(
     string? Key,
     string? Name,
     string? Description,
-    IReadOnlyList<EnvironmentKey> EnabledIn);
+    IReadOnlyList<EnvironmentKey> EnabledIn,
+    Guid CausedBy);
 
 /// <summary>The wire shape. <see cref="CreateFlagCommand"/> is what survives validation.</summary>
 public sealed record CreateFlagRequest(

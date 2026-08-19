@@ -13,6 +13,8 @@ namespace FeatureFlags.Infrastructure.Tests;
 [Collection(nameof(PostgresCollection))]
 public sealed class FeatureFlagRepositoryConcurrencyTests(PostgresFixture postgres)
 {
+    private static readonly Guid CausedBy = Guid.Parse("11111111-1111-1111-1111-111111111111");
+
     [Fact]
     public async Task SaveChangesAsync_WhenTwoWritersToggleTheSameFlagFromTheSameVersion_TheSecondShouldFailWithConcurrencyConflict()
     {
@@ -23,7 +25,7 @@ public sealed class FeatureFlagRepositoryConcurrencyTests(PostgresFixture postgr
         await using (var seedContext = postgres.NewDbContext())
         {
             var seedRepository = new FeatureFlagRepository(seedContext);
-            var flag = FeatureFlag.Create(key.Value, "Concurrency test", null, [], now).Value;
+            var flag = FeatureFlag.Create(key.Value, "Concurrency test", null, [], now, CausedBy).Value;
 
             await seedRepository.AddAsync(flag, cancellationToken);
             var seedResult = await seedRepository.SaveChangesAsync(cancellationToken);
@@ -44,8 +46,8 @@ public sealed class FeatureFlagRepositoryConcurrencyTests(PostgresFixture postgr
         var secondFlag = (await secondRepository.GetByKeyAsync(key, cancellationToken))
             .Match(flag => flag, () => throw new InvalidOperationException("Seed flag missing."));
 
-        firstFlag.SetEnabled(EnvironmentKey.Production, isEnabled: true, now.AddMinutes(1));
-        secondFlag.SetEnabled(EnvironmentKey.Staging, isEnabled: true, now.AddMinutes(1));
+        firstFlag.SetEnabled(EnvironmentKey.Production, isEnabled: true, now.AddMinutes(1), CausedBy);
+        secondFlag.SetEnabled(EnvironmentKey.Staging, isEnabled: true, now.AddMinutes(1), CausedBy);
 
         var firstResult = await firstRepository.SaveChangesAsync(cancellationToken);
         Assert.True(firstResult.IsSuccess);

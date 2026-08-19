@@ -1,35 +1,26 @@
 using System.Security.Claims;
-using FeatureFlags.Domain.Environments;
 using FeatureFlags.Domain.Flags;
 using FeatureFlags.Domain.Shared;
 using FeatureFlags.Domain.Users;
 using FeatureFlags.Server.Api;
 
-namespace FeatureFlags.Server.Features.Flags.ToggleFlag;
+namespace FeatureFlags.Server.Features.Flags.UpdateFlag;
 
-public static class ToggleFlagEndpoint
+public static class UpdateFlagEndpoint
 {
-    public static IEndpointRouteBuilder MapToggleFlag(this IEndpointRouteBuilder endpoints)
+    public static IEndpointRouteBuilder MapUpdateFlag(this IEndpointRouteBuilder endpoints)
     {
-        // PUT on the state subresource rather than POST /toggle: the caller sends the state it
-        // wants, so a retry after a dropped response sets the same thing instead of flipping it back.
-        endpoints.MapPut("/flags/{key}/state", async (
+        endpoints.MapPut("/flags/{key}", async (
             string key,
-            ToggleFlagRequest request,
+            UpdateFlagRequest request,
             ClaimsPrincipal principal,
-            ToggleFlagHandler handler,
+            UpdateFlagHandler handler,
             CancellationToken cancellationToken) =>
         {
             var keyResult = FlagKey.Create(key);
             if (keyResult.IsFailure)
             {
                 return keyResult.Error.ToProblem();
-            }
-
-            var environmentResult = EnvironmentKey.Create(request.Environment);
-            if (environmentResult.IsFailure)
-            {
-                return environmentResult.Error.ToProblem();
             }
 
             var causedBy = principal.GetUserId().ToResult(UserErrors.NotProvisioned);
@@ -39,7 +30,7 @@ public static class ToggleFlagEndpoint
             }
 
             var result = await handler.HandleAsync(
-                new ToggleFlagCommand(keyResult.Value, environmentResult.Value, request.IsEnabled, causedBy.Value),
+                new UpdateFlagCommand(keyResult.Value, request.Name, request.Description, causedBy.Value),
                 cancellationToken);
 
             return result.Match(
@@ -47,9 +38,9 @@ public static class ToggleFlagEndpoint
                 error => error.ToProblem());
         })
         .RequireAuthorization(AuthPolicies.SignedIn)
-        .WithName("ToggleFlag")
-        .WithSummary("Turns a flag on or off in one environment.")
-        .Produces<ToggleFlagResponse>()
+        .WithName("UpdateFlag")
+        .WithSummary("Updates a flag's name and description. The key cannot be changed.")
+        .Produces<UpdateFlagResponse>()
         .ProducesProblem(StatusCodes.Status400BadRequest)
         .ProducesProblem(StatusCodes.Status401Unauthorized)
         .ProducesProblem(StatusCodes.Status404NotFound);

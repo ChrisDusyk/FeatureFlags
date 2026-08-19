@@ -1,3 +1,4 @@
+using FeatureFlags.Domain.Flags.Events;
 using FeatureFlags.Domain.Shared;
 
 namespace FeatureFlags.Domain.Flags;
@@ -9,4 +10,10 @@ public interface IFlagViewRepository
     Task<IReadOnlyList<FlagView>> ListAsync(CancellationToken cancellationToken = default);
 
     Task<Option<FlagView>> GetByKeyAsync(FlagKey key, CancellationToken cancellationToken = default);
+
+    /// <summary>One flag's full event history, newest first. Small and unpaginated — a flag's
+    /// event count stays in the dozens even over a long life. Takes the flag's id rather than its
+    /// key because every caller already has one from a prior <see cref="GetByKeyAsync"/> — that is
+    /// also how a caller answers "does this flag exist" before calling this.</summary>
+    Task<IReadOnlyList<IFlagEvent>> GetHistoryAsync(Guid flagId, CancellationToken cancellationToken = default);
 }

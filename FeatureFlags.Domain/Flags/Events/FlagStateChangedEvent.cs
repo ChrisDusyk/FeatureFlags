@@ -6,4 +6,5 @@ public sealed record FlagStateChangedEvent(
     Guid FlagId,
     EnvironmentKey Environment,
     bool IsEnabled,
-    DateTimeOffset OccurredAt) : IFlagEvent;
+    DateTimeOffset OccurredAt,
+    Guid? CausedBy) : IFlagEvent;

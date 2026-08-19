@@ -25,6 +25,51 @@ interface ListFlagsResponse {
   flags: Flag[];
 }
 
+export interface FlagState {
+  environment: string;
+  isEnabled: boolean;
+  updatedAt: string;
+}
+
+/** A flag's full details, across every environment at once — unlike Flag, which is scoped to one. */
+export interface FlagDetail {
+  id: string;
+  key: string;
+  name: string;
+  description: string;
+  createdAt: string;
+  updatedAt: string;
+  states: FlagState[];
+}
+
+export interface UpdateFlagInput {
+  name: string;
+  description: string;
+}
+
+export type FlagHistoryEventType = 'FlagCreated' | 'FlagDetailsChanged' | 'FlagStateChanged';
+
+/**
+ * One entry in a flag's activity log. `eventType` says which of the other fields are set:
+ * name/description for FlagCreated and FlagDetailsChanged, environment/isEnabled for
+ * FlagStateChanged.
+ */
+export interface FlagHistoryEntry {
+  eventType: FlagHistoryEventType;
+  occurredAt: string;
+  /** Who caused this, or null when the actor is unknown — history backfilled before attribution
+   * existed carries no real actor. */
+  causedByName: string | null;
+  name: string | null;
+  description: string | null;
+  environment: string | null;
+  isEnabled: boolean | null;
+}
+
+interface GetFlagHistoryResponse {
+  entries: FlagHistoryEntry[];
+}
+
 export interface CreateFlagInput {
   key: string;
   name: string;
@@ -144,4 +189,35 @@ export async function setFlagState(
   });
 
   return (await response.json()) as FlagStateResult;
+}
+
+export async function getFlag(key: string, signal?: AbortSignal): Promise<FlagDetail> {
+  const response = await send(`/api/flags/${encodeURIComponent(key)}`, {
+    signal,
+    headers: { accept: 'application/json' },
+  });
+
+  return (await response.json()) as FlagDetail;
+}
+
+/** Updates a flag's name and description. There is no way to send a key here — it cannot change. */
+export async function updateFlag(key: string, input: UpdateFlagInput): Promise<FlagDetail> {
+  const response = await send(`/api/flags/${encodeURIComponent(key)}`, {
+    method: 'PUT',
+    headers: { 'content-type': 'application/json', accept: 'application/json' },
+    body: JSON.stringify(input),
+  });
+
+  return (await response.json()) as FlagDetail;
+}
+
+export async function getFlagHistory(key: string, signal?: AbortSignal): Promise<FlagHistoryEntry[]> {
+  const response = await send(`/api/flags/${encodeURIComponent(key)}/history`, {
+    signal,
+    headers: { accept: 'application/json' },
+  });
+
+  const body = (await response.json()) as GetFlagHistoryResponse;
+
+  return body.entries;
 }

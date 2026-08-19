@@ -1,11 +1,15 @@
 using FeatureFlags.Domain.Shared;
 using FeatureFlags.Domain.Users;
 
-namespace FeatureFlags.Server.Tests.Features.Users.GetCurrentUser;
+namespace FeatureFlags.Server.Tests.Fakes;
 
 /// <summary>
 /// In-memory stand-in for the EF repository. Read-only, like the real one — the mirror is
 /// written by a database trigger, so there is no Add or Save to fake.
+/// <para>
+/// Lives outside Features/ because it stands in for a Domain interface more than one flag slice
+/// depends on — copying it into each slice would make them drift.
+/// </para>
 /// </summary>
 internal sealed class FakeUserRepository : IUserRepository
 {
@@ -17,4 +21,7 @@ internal sealed class FakeUserRepository : IUserRepository
         Task.FromResult(_users.TryGetValue(id, out var user)
             ? Option<User>.Some(user)
             : Option<User>.None);
+
+    public Task<IReadOnlyList<User>> GetByIdsAsync(IReadOnlyCollection<Guid> ids, CancellationToken cancellationToken = default) =>
+        Task.FromResult<IReadOnlyList<User>>([.. ids.Where(_users.ContainsKey).Select(id => _users[id])]);
 }

@@ -11,6 +11,8 @@ public class CreateFlagHandlerTests
 {
     private static readonly DateTimeOffset Now = new(2026, 7, 31, 12, 0, 0, TimeSpan.Zero);
 
+    private static readonly Guid CausedBy = Guid.Parse("11111111-1111-1111-1111-111111111111");
+
     private static readonly EnvironmentKey[] Nowhere = [];
 
     private readonly FakeFeatureFlagRepository _repository = new();
@@ -21,7 +23,7 @@ public class CreateFlagHandlerTests
     [Fact]
     public async Task HandleAsync_WithValidCommand_ShouldPersistFlagAndReturnResponse()
     {
-        var command = new CreateFlagCommand("new-checkout", "New checkout", "Rewritten checkout.", [EnvironmentKey.Development]);
+        var command = new CreateFlagCommand("new-checkout", "New checkout", "Rewritten checkout.", [EnvironmentKey.Development], CausedBy);
 
         var result = await CreateSut().HandleAsync(command, TestContext.Current.CancellationToken);
 
@@ -44,7 +46,7 @@ public class CreateFlagHandlerTests
     public async Task HandleAsync_ShouldStampTimestampsFromTimeProvider()
     {
         _timeProvider.SetUtcNow(Now.AddDays(3));
-        var command = new CreateFlagCommand("new-checkout", "New checkout", null, Nowhere);
+        var command = new CreateFlagCommand("new-checkout", "New checkout", null, Nowhere, CausedBy);
 
         var result = await CreateSut().HandleAsync(command, TestContext.Current.CancellationToken);
 
@@ -54,7 +56,7 @@ public class CreateFlagHandlerTests
     [Fact]
     public async Task HandleAsync_ShouldNormalizeKey()
     {
-        var command = new CreateFlagCommand("  NEW-Checkout  ", "New checkout", null, Nowhere);
+        var command = new CreateFlagCommand("  NEW-Checkout  ", "New checkout", null, Nowhere, CausedBy);
 
         var result = await CreateSut().HandleAsync(command, TestContext.Current.CancellationToken);
 
@@ -65,8 +67,8 @@ public class CreateFlagHandlerTests
     [Fact]
     public async Task HandleAsync_WhenKeyAlreadyExists_ShouldReturnConflictAndNotPersist()
     {
-        _repository.Seed(FeatureFlag.Create("new-checkout", "Existing", null, Nowhere, Now).Value);
-        var command = new CreateFlagCommand("new-checkout", "New checkout", null, Nowhere);
+        _repository.Seed(FeatureFlag.Create("new-checkout", "Existing", null, Nowhere, Now, CausedBy).Value);
+        var command = new CreateFlagCommand("new-checkout", "New checkout", null, Nowhere, CausedBy);
 
         var result = await CreateSut().HandleAsync(command, TestContext.Current.CancellationToken);
 
@@ -80,8 +82,8 @@ public class CreateFlagHandlerTests
     [Fact]
     public async Task HandleAsync_WhenKeyDiffersOnlyByCasing_ShouldReturnConflict()
     {
-        _repository.Seed(FeatureFlag.Create("new-checkout", "Existing", null, Nowhere, Now).Value);
-        var command = new CreateFlagCommand("NEW-CHECKOUT", "New checkout", null, Nowhere);
+        _repository.Seed(FeatureFlag.Create("new-checkout", "Existing", null, Nowhere, Now, CausedBy).Value);
+        var command = new CreateFlagCommand("NEW-CHECKOUT", "New checkout", null, Nowhere, CausedBy);
 
         var result = await CreateSut().HandleAsync(command, TestContext.Current.CancellationToken);
 
@@ -99,7 +101,7 @@ public class CreateFlagHandlerTests
         string? name,
         string expectedCode)
     {
-        var command = new CreateFlagCommand(key, name, null, Nowhere);
+        var command = new CreateFlagCommand(key, name, null, Nowhere, CausedBy);
 
         var result = await CreateSut().HandleAsync(command, TestContext.Current.CancellationToken);
 
@@ -116,7 +118,7 @@ public class CreateFlagHandlerTests
         // The key was free at the check but taken by the time the insert ran.
         var key = FlagKey.Create("new-checkout").Value;
         _repository.FailNextSaveWith(FlagErrors.DuplicateKey(key));
-        var command = new CreateFlagCommand("new-checkout", "New checkout", null, Nowhere);
+        var command = new CreateFlagCommand("new-checkout", "New checkout", null, Nowhere, CausedBy);
 
         var result = await CreateSut().HandleAsync(command, TestContext.Current.CancellationToken);
 
@@ -129,7 +131,7 @@ public class CreateFlagHandlerTests
     [Fact]
     public async Task HandleAsync_ShouldReturnAStateForEveryEnvironment()
     {
-        var command = new CreateFlagCommand("new-checkout", "New checkout", null, [EnvironmentKey.Development]);
+        var command = new CreateFlagCommand("new-checkout", "New checkout", null, [EnvironmentKey.Development], CausedBy);
 
         var result = await CreateSut().HandleAsync(command, TestContext.Current.CancellationToken);
 
@@ -141,7 +143,7 @@ public class CreateFlagHandlerTests
     [Fact]
     public async Task HandleAsync_ShouldEnableOnlyTheEnvironmentsAskedFor()
     {
-        var command = new CreateFlagCommand("new-checkout", "New checkout", null, [EnvironmentKey.Development]);
+        var command = new CreateFlagCommand("new-checkout", "New checkout", null, [EnvironmentKey.Development], CausedBy);
 
         var result = await CreateSut().HandleAsync(command, TestContext.Current.CancellationToken);
 
@@ -154,7 +156,7 @@ public class CreateFlagHandlerTests
     [Fact]
     public async Task HandleAsync_WithNoEnvironments_ShouldPersistTheFlagOffEverywhere()
     {
-        var command = new CreateFlagCommand("new-checkout", "New checkout", null, Nowhere);
+        var command = new CreateFlagCommand("new-checkout", "New checkout", null, Nowhere, CausedBy);
 
         var result = await CreateSut().HandleAsync(command, TestContext.Current.CancellationToken);
 
