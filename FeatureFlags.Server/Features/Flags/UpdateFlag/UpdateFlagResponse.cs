@@ -2,7 +2,11 @@ using FeatureFlags.Domain.Flags;
 
 namespace FeatureFlags.Server.Features.Flags.UpdateFlag;
 
-public sealed record FlagStateResponse(string Environment, bool IsEnabled, DateTimeOffset UpdatedAt);
+// Slice-qualified rather than plain FlagStateResponse: AddOpenApi()'s default schema-ID
+// generation keys on the bare type name, and this shape is declared once per slice (see
+// CreateFlagResponse.cs, GetFlagResponse.cs) — an unqualified name here would collide with
+// theirs and silently collapse to whichever one the generator happened to see first.
+public sealed record UpdateFlagStateResponse(string Environment, bool IsEnabled, DateTimeOffset UpdatedAt);
 
 public sealed record UpdateFlagResponse(
     Guid Id,
@@ -11,7 +15,7 @@ public sealed record UpdateFlagResponse(
     string Description,
     DateTimeOffset CreatedAt,
     DateTimeOffset UpdatedAt,
-    IReadOnlyList<FlagStateResponse> States)
+    IReadOnlyList<UpdateFlagStateResponse> States)
 {
     public static UpdateFlagResponse From(FeatureFlag flag) => new(
         flag.Id,
@@ -21,5 +25,5 @@ public sealed record UpdateFlagResponse(
         flag.CreatedAt,
         flag.UpdatedAt,
         [.. flag.States.Select(state =>
-            new FlagStateResponse(state.Environment.Value, state.IsEnabled, state.UpdatedAt))]);
+            new UpdateFlagStateResponse(state.Environment.Value, state.IsEnabled, state.UpdatedAt))]);
 }
