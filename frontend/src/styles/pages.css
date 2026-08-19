@@ -454,6 +454,20 @@
 
 /* -------------------------------------------------------- flag detail --- */
 
+.flagdetail__back {
+  display: inline-block;
+  font-family: var(--font-mono);
+  font-size: 0.6875rem;
+  font-weight: 500;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--graphite-dim);
+}
+
+.flagdetail__back:hover {
+  color: var(--graphite);
+}
+
 .flagdetail__key {
   display: flex;
   align-items: baseline;

@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from 'react';
-import { useParams } from 'react-router-dom';
+import { Link, useParams } from 'react-router-dom';
 
 import { PageHeader } from '../../shell/PageHeader';
 import { ApiError, updateFlag, type FlagDetail, type FlagHistoryEntry } from './api';
@@ -86,6 +86,14 @@ function EditFlagForm({
   );
 }
 
+function BackToFlagsLink() {
+  return (
+    <Link className="flagdetail__back" to="/flags">
+      ← All flags
+    </Link>
+  );
+}
+
 export function FlagDetailPage() {
   const { key = '' } = useParams();
   const { detail, history, reload } = useFlagDetail(key);
@@ -93,17 +101,23 @@ export function FlagDetailPage() {
 
   if (detail.status === 'loading') {
     return (
-      <p className="flaglist__note" role="status">
-        Reading {key}…
-      </p>
+      <>
+        <BackToFlagsLink />
+        <p className="flaglist__note" role="status">
+          Reading {key}…
+        </p>
+      </>
     );
   }
 
   if (detail.status === 'failed') {
     return (
-      <div className="flaglist__failed" role="alert">
-        <p>{detail.message}</p>
-      </div>
+      <>
+        <BackToFlagsLink />
+        <div className="flaglist__failed" role="alert">
+          <p>{detail.message}</p>
+        </div>
+      </>
     );
   }
 
@@ -111,6 +125,7 @@ export function FlagDetailPage() {
 
   return (
     <>
+      <BackToFlagsLink />
       <PageHeader eyebrow="Flags" title={flag.name} lede={`Details and activity for ${flag.key}.`} />
 
       <p className="flagdetail__key">
