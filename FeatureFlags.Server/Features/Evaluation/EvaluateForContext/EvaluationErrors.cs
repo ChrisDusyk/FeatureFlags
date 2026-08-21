@@ -20,4 +20,11 @@ public static class EvaluationErrors
         $"The value for '{attribute}' is not one every client can compare. Text must be " +
         $"{AttributeValue.MaxTextLength} characters or fewer, and a number must be finite and no " +
         $"larger than {AttributeValue.MaxMagnitude:0}.");
+
+    /// <summary>The body did not parse as the request shape. A malformed <c>Content-Type</c>,
+    /// truncated JSON, or a value of the wrong kind all land here rather than as an unhandled
+    /// exception — a caller sending nonsense gets a ProblemDetails, not a 500.</summary>
+    public static Error MalformedBody => Error.Validation(
+        "Evaluation.Context.MalformedBody",
+        "The request body could not be read as JSON.");
 }

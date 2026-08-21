@@ -3,6 +3,7 @@ using FeatureFlags.Domain.Shared;
 using FeatureFlags.Evaluation;
 using FeatureFlags.Server.Api;
 using Microsoft.AspNetCore.Mvc;
+using System.Text.Json;
 
 namespace FeatureFlags.Server.Features.Evaluation.EvaluateForContext;
 
@@ -22,14 +23,16 @@ public static class EvaluateForContextEndpoint
     {
         endpoints.MapPost("/evaluation", async (
             HttpContext context,
-            EvaluateForContextRequest request,
             EvaluateForContextHandler handler,
             CancellationToken cancellationToken) =>
         {
-            // Before anything is read: a secret key presented from a browser is refused outright,
-            // whatever it was asking for. Both key kinds are otherwise welcome here — a server-side
-            // caller wanting a one-shot contextual answer without holding the ruleset is a
-            // perfectly reasonable thing to be.
+            // Before anything is read — and this time that is literally true rather than
+            // aspirational. A minimal API endpoint binds a complex-type body parameter before its
+            // delegate runs at all, so taking EvaluateForContextRequest as a parameter here would
+            // have the framework deserialize the body ahead of these checks: a secret key from a
+            // browser would still pay for the JSON parse before being refused. Taking HttpContext
+            // instead and reading the body by hand, after the checks below, is what makes the
+            // refusal actually free.
             var credential = BrowserCredentialRule.Check(context);
             if (credential.IsFailure)
             {
@@ -44,7 +47,28 @@ public static class EvaluateForContextEndpoint
                 return environment.Error.ToProblem();
             }
 
-            var evaluationContext = Bind(request.Context);
+            EvaluateForContextRequest? request;
+
+            try
+            {
+                request = await context.Request.ReadFromJsonAsync<EvaluateForContextRequest>(cancellationToken);
+            }
+            // Malformed JSON: the bytes we got don't parse.
+            catch (JsonException)
+            {
+                return EvaluationErrors.MalformedBody.ToProblem();
+            }
+            // Kestrel enforces the size cap by throwing while the body is read, from wherever that
+            // read happens to occur. RequestDelegateFactory's auto-generated binding for a bound
+            // parameter catches this and answers with the exception's own status code — reading
+            // the body by hand gets none of that for free, and without this catch a request over
+            // MaxRequestBytes would surface as an unhandled 500 instead of the 413 it actually is.
+            catch (BadHttpRequestException exception)
+            {
+                return Results.StatusCode(exception.StatusCode);
+            }
+
+            var evaluationContext = Bind(request?.Context);
             if (evaluationContext.IsFailure)
             {
                 return evaluationContext.Error.ToProblem();
