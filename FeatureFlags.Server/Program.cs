@@ -1,3 +1,4 @@
+using FeatureFlags.Evaluation;
 using FeatureFlags.Infrastructure;
 using FeatureFlags.Server.Api;
 using FeatureFlags.Server.Features.Flags.CreateFlag;
@@ -5,11 +6,18 @@ using FeatureFlags.Server.Features.Flags.EvaluateFlags;
 using FeatureFlags.Server.Features.Flags.GetFlag;
 using FeatureFlags.Server.Features.Flags.GetFlagHistory;
 using FeatureFlags.Server.Features.Flags.ListFlags;
+using FeatureFlags.Server.Features.Flags.SetFlagTargeting;
 using FeatureFlags.Server.Features.Flags.ToggleFlag;
 using FeatureFlags.Server.Features.Flags.UpdateFlag;
 using FeatureFlags.Server.Features.SdkKeys.IssueSdkKey;
 using FeatureFlags.Server.Features.SdkKeys.ListSdkKeys;
 using FeatureFlags.Server.Features.SdkKeys.RevokeSdkKey;
+using FeatureFlags.Server.Features.Segments.CreateSegment;
+using FeatureFlags.Server.Features.Segments.DeleteSegment;
+using FeatureFlags.Server.Features.Segments.GetSegment;
+using FeatureFlags.Server.Features.Segments.GetSegmentHistory;
+using FeatureFlags.Server.Features.Segments.ListSegments;
+using FeatureFlags.Server.Features.Segments.UpdateSegment;
 using FeatureFlags.Server.Features.Users.GetCurrentUser;
 using FeatureFlags.Server.Hosting;
 using Microsoft.AspNetCore.HttpOverrides;
@@ -35,6 +43,12 @@ builder.AddConsoleAuthentication();
 
 // Add services to the container.
 builder.Services.AddProblemDetails();
+
+// A context attribute and a condition value are bare JSON primitives on the wire, because JSON's
+// own types are exactly the three one can hold. Registering the converter here is what lets model
+// binding read the same shape a ruleset payload is written in — one rendering, not two.
+builder.Services.ConfigureHttpJsonOptions(options =>
+    options.SerializerOptions.Converters.Add(new AttributeValueJsonConverter()));
 builder.Services.AddBrowserCors(builder.Configuration);
 builder.Services.AddSingleton<TimeProvider>(TimeProvider.System);
 
@@ -51,6 +65,13 @@ builder.Services.AddScoped<EvaluateFlagsHandler>();
 builder.Services.AddScoped<GetFlagHandler>();
 builder.Services.AddScoped<UpdateFlagHandler>();
 builder.Services.AddScoped<GetFlagHistoryHandler>();
+builder.Services.AddScoped<SetFlagTargetingHandler>();
+builder.Services.AddScoped<CreateSegmentHandler>();
+builder.Services.AddScoped<ListSegmentsHandler>();
+builder.Services.AddScoped<GetSegmentHandler>();
+builder.Services.AddScoped<UpdateSegmentHandler>();
+builder.Services.AddScoped<DeleteSegmentHandler>();
+builder.Services.AddScoped<GetSegmentHistoryHandler>();
 builder.Services.AddScoped<IssueSdkKeyHandler>();
 builder.Services.AddScoped<ListSdkKeysHandler>();
 builder.Services.AddScoped<RevokeSdkKeyHandler>();
@@ -136,6 +157,13 @@ api.MapEvaluateFlags();
 api.MapGetFlag();
 api.MapUpdateFlag();
 api.MapGetFlagHistory();
+api.MapSetFlagTargeting();
+api.MapListSegments();
+api.MapCreateSegment();
+api.MapGetSegment();
+api.MapUpdateSegment();
+api.MapDeleteSegment();
+api.MapGetSegmentHistory();
 api.MapIssueSdkKey();
 api.MapListSdkKeys();
 api.MapRevokeSdkKey();

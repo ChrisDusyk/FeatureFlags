@@ -103,6 +103,24 @@ public static class SegmentErrors
         "Segment.ConcurrencyConflict",
         $"The segment '{key}' was changed by someone else. Reload and try again.");
 
+    /// <summary>
+    /// The segment is still holding something up. The message names the flags rather than saying
+    /// "it is in use", because the next thing whoever hit this has to do is go and untarget them.
+    /// </summary>
+    public static Error StillTargeted(SegmentKey key, IReadOnlyList<Flags.FlagTargetingView> targeting) => Error.Conflict(
+        "Segment.StillTargeted",
+        $"The segment '{key}' is targeted by {Describe(targeting)}. Remove the targeting first.");
+
+    /// <summary>
+    /// A flag was pointed at segments that do not exist. Named rather than counted, because the
+    /// caller's next move is to work out which of them is a typo.
+    /// </summary>
+    public static Error UnknownSegments(IReadOnlyList<SegmentKey> keys) => Error.Validation(
+        "Segment.Unknown",
+        keys.Count == 1
+            ? $"No segment with the key '{keys[0]}' exists."
+            : $"No segments with these keys exist: {string.Join(", ", keys.Select(key => $"'{key}'"))}.");
+
     public static Error NotFound(SegmentKey key) => Error.NotFound(
         "Segment.NotFound",
         $"No segment with the key '{key}' exists.");
@@ -114,6 +132,11 @@ public static class SegmentErrors
     public static Error AlreadyDeleted(SegmentKey key) => Error.Conflict(
         "Segment.AlreadyDeleted",
         $"The segment '{key}' has already been deleted.");
+
+    private static string Describe(IReadOnlyList<Flags.FlagTargetingView> targeting) =>
+        string.Join(", ", targeting
+            .GroupBy(view => view.Key.Value, StringComparer.Ordinal)
+            .Select(group => $"{group.Key} ({string.Join(", ", group.Select(view => view.Environment.Value))})"));
 
     private static string Describe(AttributeValueKind kind) => kind switch
     {
