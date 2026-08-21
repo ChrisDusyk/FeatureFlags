@@ -45,20 +45,22 @@ public class ListSegmentsHandlerTests
         Assert.Equal(2, summary.ConditionCount);
         Assert.Equal(2, summary.IncludedKeyCount);
         Assert.Equal(1, summary.ExcludedKeyCount);
-        Assert.False(summary.MatchesNobody);
+        Assert.False(summary.IsEmptyDefinition);
     }
 
     [Fact]
-    public async Task HandleAsync_ShouldFlagASegmentNobodyCanBeIn()
+    public async Task HandleAsync_ShouldFlagAnEmptyDefinition()
     {
-        // Worth saying in the list rather than leaving somebody to infer it from three zeroes: a
-        // segment that matches nobody silently turns off every flag that targets it.
+        // Worth saying in the list rather than leaving somebody to infer it from three zeroes: an
+        // empty definition silently turns off every flag that targets it. IsEmptyDefinition is
+        // named for what it checks — structural emptiness — not "matches nobody" in general, which
+        // a definition can also do through mutually exclusive conditions this does not detect.
         var repository = new FakeSegmentViewRepository();
         repository.Seed(View("half-finished", SegmentDefinition.Create([], ["user-1"], []).Value));
 
         var result = await new ListSegmentsHandler(repository).HandleAsync(TestContext.Current.CancellationToken);
 
-        Assert.True(result.Value.Segments.Single().MatchesNobody);
+        Assert.True(result.Value.Segments.Single().IsEmptyDefinition);
     }
 
     [Fact]

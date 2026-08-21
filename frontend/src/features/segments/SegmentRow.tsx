@@ -30,7 +30,7 @@ export function SegmentRow({ segment }: SegmentRowProps) {
         A segment nobody can be in is not an empty segment — it silently turns off every flag that
         targets it, so the list says so rather than leaving three zeroes to be interpreted.
       */}
-      {segment.matchesNobody && (
+      {segment.isEmptyDefinition && (
         <p className="seglist__warning">Nobody is in this segment as written.</p>
       )}
     </li>

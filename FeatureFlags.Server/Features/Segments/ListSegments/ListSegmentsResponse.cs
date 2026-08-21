@@ -14,7 +14,7 @@ public sealed record ListSegmentSummary(
     int ConditionCount,
     int IncludedKeyCount,
     int ExcludedKeyCount,
-    bool MatchesNobody,
+    bool IsEmptyDefinition,
     DateTimeOffset CreatedAt,
     DateTimeOffset UpdatedAt)
 {
@@ -27,7 +27,9 @@ public sealed record ListSegmentSummary(
         segment.Definition.IncludedKeys.Count,
         segment.Definition.ExcludedKeys.Count,
         // Worth saying out loud in the list rather than leaving somebody to infer it from three
-        // zeroes: a segment nobody can be in silently turns off every flag that targets it.
+        // zeroes: an empty definition silently turns off every flag that targets it. Named for
+        // what it actually checks — see SegmentDefinition.IsEmpty — rather than "matches nobody",
+        // which a definition can also do through mutually exclusive conditions this does not detect.
         segment.Definition.IsEmpty,
         segment.CreatedAt,
         segment.UpdatedAt);

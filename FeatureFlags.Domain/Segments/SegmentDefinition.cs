@@ -52,7 +52,14 @@ public sealed record SegmentDefinition
     /// </summary>
     public static SegmentDefinition Empty { get; } = new([], [], []);
 
-    /// <summary>Whether this segment could ever match anyone.</summary>
+    /// <summary>
+    /// Whether this definition has nothing in it: no included keys and no conditions. The one
+    /// case guaranteed to match nobody — not the only one. A definition whose conditions happen
+    /// to be mutually exclusive (two <c>equals</c> conditions on the same attribute demanding
+    /// different values, say) also matches nobody, but detecting that in general is a
+    /// satisfiability problem this checks makes no attempt at; this is a structural read of the
+    /// definition, not a proof about what it can match.
+    /// </summary>
     public bool IsEmpty => IncludedKeys.Count == 0 && Conditions.Count == 0;
 
     public static Result<SegmentDefinition> Create(

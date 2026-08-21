@@ -16,7 +16,7 @@ interface DefinitionEditorProps {
  * matches nobody rather than everybody.
  */
 export function DefinitionEditor({ definition, onChange, disabled }: DefinitionEditorProps) {
-  const matchesNobody =
+  const isEmptyDefinition =
     definition.includedKeys.length === 0 && definition.conditions.length === 0;
 
   return (
@@ -109,7 +109,7 @@ export function DefinitionEditor({ definition, onChange, disabled }: DefinitionE
         Said here, while it can still be fixed, rather than left to be noticed as a flag that went
         quiet. A segment nobody can be in turns off every flag that targets it.
       */}
-      {matchesNobody && (
+      {isEmptyDefinition && (
         <p className="definition__warning" role="status">
           As written, nobody is in this segment — every flag that targets it will be off. Add an
           included key or a condition.

@@ -45,9 +45,10 @@ export interface SegmentSummary {
   conditionCount: number;
   includedKeyCount: number;
   excludedKeyCount: number;
-  /** Nobody can be in it. Worth saying out loud: a segment that matches nobody silently turns off
-   * every flag that targets it. */
-  matchesNobody: boolean;
+  /** No included keys and no conditions — the one case guaranteed to match nobody, not the only
+   * one a definition can. Worth saying out loud: an empty definition silently turns off every
+   * flag that targets it. */
+  isEmptyDefinition: boolean;
   createdAt: string;
   updatedAt: string;
 }

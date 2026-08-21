@@ -96,7 +96,7 @@ export function TargetingEditor({
                 />
                 <span className="targeting__name">{segment.name}</span>
                 <code className="targeting__key">{segment.key}</code>
-                {segment.matchesNobody && (
+                {segment.isEmptyDefinition && (
                   <span className="targeting__warning">nobody is in this</span>
                 )}
               </label>
