@@ -1107,8 +1107,15 @@
   align-items: center;
 }
 
+/*
+  Overrides width, not just max-width — the base .dialog rule sets
+  width: min(32rem, ...), and width wins over a max-width that resolves larger, so a modifier
+  that only raised max-width had no visible effect. The segment dialog earns the room: its
+  condition rows lay out attribute, comparison, type, and remove side by side, and at 32rem
+  they wrapped onto their own lines for no reason.
+*/
 .dialog--wide {
-  max-width: 44rem;
+  width: min(60rem, calc(100vw - 3rem));
 }
 
 /* ------------------------------------------------------------ dependents --- */
