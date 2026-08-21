@@ -66,7 +66,11 @@ public static class SetFlagTargetingEndpoint
         .Produces<SetFlagTargetingResponse>()
         .ProducesProblem(StatusCodes.Status400BadRequest)
         .ProducesProblem(StatusCodes.Status401Unauthorized)
-        .ProducesProblem(StatusCodes.Status404NotFound);
+        .ProducesProblem(StatusCodes.Status404NotFound)
+        // Another writer racing this one on the same flag's event stream — SaveChangesAsync
+        // translates that to FlagErrors.ConcurrencyConflict. ToggleFlag and UpdateFlag can fail
+        // the same way and do not declare it; that gap predates this slice and is not fixed here.
+        .ProducesProblem(StatusCodes.Status409Conflict);
 
         return endpoints;
     }

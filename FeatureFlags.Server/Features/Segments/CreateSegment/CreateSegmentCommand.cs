@@ -30,8 +30,9 @@ public sealed record CreateSegmentDefinitionRequest(
 /// <summary>
 /// <see cref="Values"/> arrives as bare JSON primitives — <c>"pro"</c>, <c>47</c>, <c>true</c> —
 /// because JSON's own types are exactly the three an attribute can hold. See
-/// <see cref="AttributeValueJsonConverter"/>, which is registered in <c>Program.cs</c> so that
-/// model binding and a ruleset payload read the same shape.
+/// <see cref="AttributeValueJsonConverter"/>, declared directly on <see cref="AttributeValue"/>
+/// via <c>[JsonConverter]</c> rather than registered anywhere — that is what lets model binding, a
+/// ruleset payload, and everything else that serializes one agree without each remembering to opt in.
 /// </summary>
 public sealed record CreateSegmentConditionRequest(
     string? Attribute,
