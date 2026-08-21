@@ -63,12 +63,12 @@ jobs:
           dotnet build clients/dotnet/FeatureFlags.Client.Redis --configuration Release
 
       - name: Test
-        run: dotnet test --project clients/dotnet/FeatureFlags.Client.Tests --configuration Release
+        run: dotnet test --project clients/dotnet/FeatureFlags.Client.Tests/FeatureFlags.Client.Tests.csproj --configuration Release
 
       # The Redis add-on's tests start a real Redis via Testcontainers, which needs the Docker
       # daemon ubuntu-latest already ships — nothing extra to provision here.
       - name: Test the Redis cache add-on
-        run: dotnet test --project clients/dotnet/FeatureFlags.Client.Redis.Tests --configuration Release
+        run: dotnet test --project clients/dotnet/FeatureFlags.Client.Redis.Tests/FeatureFlags.Client.Redis.Tests.csproj --configuration Release
 
   node:
     runs-on: ubuntu-latest
