@@ -41,6 +41,61 @@ public sealed class EvaluationContext(string? key, IReadOnlyDictionary<string, A
     /// <summary>Looks an attribute up by name, folding the name the same way the constructor did.
     /// False when the context did not carry one, which is always a non-match rather than a
     /// default.</summary>
+    /// <summary>A context describing this subject and nothing else yet. The start of a chain of
+    /// <see cref="With(string, string)"/> calls.</summary>
+    public static EvaluationContext For(string? key) => new(key, null);
+
+    /// <summary>This context plus one text attribute. Returns a new instance — a context is
+    /// immutable, so one built once and held for a process cannot be changed under a reader.</summary>
+    public EvaluationContext With(string name, string value) => With(name, AttributeValue.OfText(value));
+
+    /// <summary>This context plus one numeric attribute.</summary>
+    public EvaluationContext With(string name, double value) => With(name, AttributeValue.OfNumber(value));
+
+    /// <summary>This context plus one true/false attribute.</summary>
+    public EvaluationContext With(string name, bool value) => With(name, AttributeValue.OfBoolean(value));
+
+    /// <summary>This context plus one already-typed attribute.</summary>
+    public EvaluationContext With(string name, AttributeValue value)
+    {
+        if (name is null)
+            throw new ArgumentNullException(nameof(name));
+
+        var combined = new Dictionary<string, AttributeValue>(Attributes.Count + 1, StringComparer.Ordinal);
+
+        foreach (var pair in Attributes)
+            combined[pair.Key] = pair.Value;
+
+        combined[NormaliseName(name)] = value;
+
+        return new EvaluationContext(Key, combined);
+    }
+
+    /// <summary>
+    /// This context laid over another. Everything here wins, and anything only
+    /// <paramref name="defaults"/> carries is kept — which is what lets an application set the
+    /// traits that never change once, at registration, and still describe a user per call.
+    /// </summary>
+    public EvaluationContext WithDefaults(EvaluationContext? defaults)
+    {
+        if (defaults is null || (defaults.Key is null && defaults.Attributes.Count == 0))
+            return this;
+
+        var combined = new Dictionary<string, AttributeValue>(
+            defaults.Attributes.Count + Attributes.Count, StringComparer.Ordinal);
+
+        foreach (var pair in defaults.Attributes)
+            combined[pair.Key] = pair.Value;
+
+        foreach (var pair in Attributes)
+            combined[pair.Key] = pair.Value;
+
+        return new EvaluationContext(Key ?? defaults.Key, combined);
+    }
+
+    /// <summary>Looks an attribute up by name, folding the name the same way this context folded
+    /// its own. False when the context did not carry one, which is always a non-match rather than
+    /// a default.</summary>
     public bool TryGetAttribute(string name, out AttributeValue value)
     {
         if (name is null)
