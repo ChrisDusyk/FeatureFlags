@@ -13,6 +13,9 @@ export function AppShell() {
   const [navOpen, setNavOpen] = useState(false);
 
   useEffect(() => {
+    // Closes the mobile nav after a navigation. A key-based remount isn't an option here — it's
+    // the whole shell around the route, not the route content, that would remount.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setNavOpen(false);
   }, [location.pathname]);
 

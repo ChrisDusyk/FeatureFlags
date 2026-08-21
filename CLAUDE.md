@@ -121,7 +121,7 @@ The admin console (`frontend/`) is a React Router SPA that mirrors the backend's
 
 - `FeatureFlags.Domain.Tests` covers domain logic and the `Result`/`Option` primitives in isolation.
 - `FeatureFlags.Server.Tests` covers feature slices end-to-end as they're added.
-- Run the whole suite with `dotnet test FeatureFlags.slnx`.
+- Run the whole suite with `dotnet test --solution FeatureFlags.slnx`. `global.json` opts the repo into the .NET 10 SDK's MTP mode for `dotnet test` (xunit v4 needs it); that mode takes `--solution`/`--project` rather than a bare path argument.
 - There is no JavaScript test runner in `frontend/` or `auth/` yet, so the auth path is covered on the .NET side (claims mapping, the authorization policies, the `User` mirror) and verified against a running stack.
 
 ## Running the app

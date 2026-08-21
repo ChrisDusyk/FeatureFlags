@@ -26,6 +26,9 @@ export function useSdkKeys(): SdkKeysResult {
   useEffect(() => {
     const controller = new AbortController();
 
+    // Resets the previous result before the new fetch starts — the documented React
+    // fetch-on-effect pattern (react.dev/learn/synchronizing-with-effects#fetching-data).
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setState({ status: 'loading' });
 
     listSdkKeys(controller.signal)
