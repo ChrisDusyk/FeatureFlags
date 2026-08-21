@@ -31,12 +31,12 @@ public static class SegmentMatcher
     /// the world.
     /// </para>
     /// </summary>
-    public static bool Matches(RulesetSegment? segment, EvaluationContext? context)
+    public static bool Matches(RulesetSegment? segment, FlagContext? context)
     {
         if (segment is null)
             return false;
 
-        context ??= EvaluationContext.Empty;
+        context ??= FlagContext.Empty;
 
         if (context.Key is not null && ContainsOrdinal(segment.Excluded, context.Key))
             return false;
@@ -62,12 +62,12 @@ public static class SegmentMatcher
     /// default value for a trait the application did not send, and inventing one would make a
     /// segment match people nobody described.
     /// </summary>
-    public static bool Satisfies(RulesetCondition? condition, EvaluationContext? context)
+    public static bool Satisfies(RulesetCondition? condition, FlagContext? context)
     {
         if (condition?.Attribute is null || condition.Operator is null)
             return false;
 
-        context ??= EvaluationContext.Empty;
+        context ??= FlagContext.Empty;
 
         if (!context.TryGetAttribute(condition.Attribute, out var actual) || actual is null)
             return false;

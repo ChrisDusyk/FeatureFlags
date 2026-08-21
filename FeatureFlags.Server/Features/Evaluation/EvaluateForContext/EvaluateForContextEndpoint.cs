@@ -72,31 +72,31 @@ public static class EvaluateForContextEndpoint
         return endpoints;
     }
 
-    private static Result<EvaluationContext> Bind(EvaluateForContextContextRequest? request)
+    private static Result<FlagContext> Bind(EvaluateForContextContextRequest? request)
     {
         if (request is null)
-            return Result.Success(EvaluationContext.Empty);
+            return Result.Success(FlagContext.Empty);
 
         if (request.Key is { Length: > MaxContextKeyLength })
-            return Result.Failure<EvaluationContext>(EvaluationErrors.ContextTooLarge);
+            return Result.Failure<FlagContext>(EvaluationErrors.ContextTooLarge);
 
         var attributes = request.Attributes ?? new Dictionary<string, AttributeValue>();
 
         if (attributes.Count > MaxAttributes)
-            return Result.Failure<EvaluationContext>(EvaluationErrors.ContextTooLarge);
+            return Result.Failure<FlagContext>(EvaluationErrors.ContextTooLarge);
 
         foreach (var attribute in attributes)
         {
             if (attribute.Key.Length > MaxAttributeNameLength)
-                return Result.Failure<EvaluationContext>(EvaluationErrors.ContextTooLarge);
+                return Result.Failure<FlagContext>(EvaluationErrors.ContextTooLarge);
 
             // A value no engine could agree on — an over-long string, a number past 2^53 — is
             // refused rather than compared. It would never match anything anyway, and saying so is
             // more use than silently answering false to everything.
             if (attribute.Value is null || !attribute.Value.IsRepresentable)
-                return Result.Failure<EvaluationContext>(EvaluationErrors.AttributeNotRepresentable(attribute.Key));
+                return Result.Failure<FlagContext>(EvaluationErrors.AttributeNotRepresentable(attribute.Key));
         }
 
-        return Result.Success(new EvaluationContext(request.Key, attributes));
+        return Result.Success(new FlagContext(request.Key, attributes));
     }
 }

@@ -3,7 +3,7 @@ using FeatureFlags.Evaluation;
 
 namespace FeatureFlags.Server.Features.Evaluation.EvaluateForContext;
 
-public sealed record EvaluateForContextQuery(EnvironmentKey Environment, EvaluationContext Context);
+public sealed record EvaluateForContextQuery(EnvironmentKey Environment, FlagContext Context);
 
 /// <summary>The wire shape. <see cref="EvaluateForContextQuery"/> is what survives validation.</summary>
 public sealed record EvaluateForContextRequest(EvaluateForContextContextRequest? Context);

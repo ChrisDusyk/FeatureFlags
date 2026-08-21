@@ -17,8 +17,8 @@ internal static class RulesetReader
     public static bool IsEnabled(
         Ruleset? ruleset,
         string key,
-        EvaluationContext? context,
-        EvaluationContext? defaults,
+        FlagContext? context,
+        FlagContext? defaults,
         bool defaultValue)
     {
         if (ruleset is null)
@@ -39,7 +39,7 @@ internal static class RulesetReader
         return FlagEvaluator.Evaluate(
             flag,
             ruleset.SegmentsByKey(),
-            (context ?? EvaluationContext.Empty).WithDefaults(defaults));
+            (context ?? FlagContext.Empty).WithDefaults(defaults));
     }
 
     /// <summary>

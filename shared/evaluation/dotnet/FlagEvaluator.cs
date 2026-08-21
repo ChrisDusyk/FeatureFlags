@@ -28,7 +28,7 @@ public static class FlagEvaluator
     public static bool Evaluate(
         RulesetFlag? flag,
         IReadOnlyDictionary<string, RulesetSegment>? segments,
-        EvaluationContext? context)
+        FlagContext? context)
     {
         // A flag nobody has heard of is not a flag that is on. The callers that want a different
         // answer supply their own default rather than asking this to guess.
@@ -41,7 +41,7 @@ public static class FlagEvaluator
         if (flag.TargetedSegments.Count == 0)
             return true;
 
-        context ??= EvaluationContext.Empty;
+        context ??= FlagContext.Empty;
 
         for (var i = 0; i < flag.TargetedSegments.Count; i++)
         {
@@ -62,7 +62,7 @@ public static class FlagEvaluator
     }
 
     /// <summary>Every flag in the ruleset, answered for one context.</summary>
-    public static IReadOnlyDictionary<string, bool> EvaluateAll(Ruleset? ruleset, EvaluationContext? context)
+    public static IReadOnlyDictionary<string, bool> EvaluateAll(Ruleset? ruleset, FlagContext? context)
     {
         if (ruleset is null)
             return new Dictionary<string, bool>(StringComparer.OrdinalIgnoreCase);
@@ -71,7 +71,7 @@ public static class FlagEvaluator
         // dropping that now would silently break `IsEnabled("New-Checkout")` for anyone relying on it.
         var evaluated = new Dictionary<string, bool>(ruleset.Flags.Count, StringComparer.OrdinalIgnoreCase);
         var segments = ruleset.SegmentsByKey();
-        var resolved = context ?? EvaluationContext.Empty;
+        var resolved = context ?? FlagContext.Empty;
 
         for (var i = 0; i < ruleset.Flags.Count; i++)
         {

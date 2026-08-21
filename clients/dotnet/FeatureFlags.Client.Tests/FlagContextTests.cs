@@ -8,7 +8,7 @@ namespace FeatureFlags.Client.Tests;
 /// Reading a flag for a particular person — the reason this package pulls a ruleset rather than a
 /// map of answers.
 /// </summary>
-public class EvaluationContextTests
+public class FlagContextTests
 {
     private const string Key =
         "ffs_dev_f992c8928754087a_7f097037aa14d671f4317df877989f05f5309c1323ecb24dab4be5597f40db10";
@@ -58,7 +58,7 @@ public class EvaluationContextTests
 
         var enabled = await client.IsEnabledAsync(
             "new-checkout",
-            EvaluationContext.For("user-1").With("plan", "pro"),
+            FlagContext.For("user-1").With("plan", "pro"),
             TestContext.Current.CancellationToken);
 
         Assert.True(enabled);
@@ -71,7 +71,7 @@ public class EvaluationContextTests
 
         var enabled = await client.IsEnabledAsync(
             "new-checkout",
-            EvaluationContext.For("user-1").With("plan", "free"),
+            FlagContext.For("user-1").With("plan", "free"),
             TestContext.Current.CancellationToken);
 
         Assert.False(enabled);
@@ -101,7 +101,7 @@ public class EvaluationContextTests
         var (client, _) = Build();
 
         Assert.True(await client.IsEnabledAsync(
-            "new-checkout", EvaluationContext.For("user-17"), TestContext.Current.CancellationToken));
+            "new-checkout", FlagContext.For("user-17"), TestContext.Current.CancellationToken));
     }
 
     [Fact]
@@ -111,7 +111,7 @@ public class EvaluationContextTests
 
         Assert.False(await client.IsEnabledAsync(
             "new-checkout",
-            EvaluationContext.For("user-99").With("plan", "pro"),
+            FlagContext.For("user-99").With("plan", "pro"),
             TestContext.Current.CancellationToken));
     }
 
@@ -119,21 +119,21 @@ public class EvaluationContextTests
     public async Task IsEnabledAsync_ShouldTakeAttributesFromTheDefaultContext()
     {
         var (client, _) = Build(options =>
-            options.DefaultContext = EvaluationContext.For(null).With("plan", "pro"));
+            options.DefaultContext = FlagContext.For(null).With("plan", "pro"));
 
         Assert.True(await client.IsEnabledAsync(
-            "new-checkout", EvaluationContext.For("user-1"), TestContext.Current.CancellationToken));
+            "new-checkout", FlagContext.For("user-1"), TestContext.Current.CancellationToken));
     }
 
     [Fact]
     public async Task IsEnabledAsync_ShouldLetAPerCallAttributeBeatTheDefault()
     {
         var (client, _) = Build(options =>
-            options.DefaultContext = EvaluationContext.For(null).With("plan", "pro"));
+            options.DefaultContext = FlagContext.For(null).With("plan", "pro"));
 
         Assert.False(await client.IsEnabledAsync(
             "new-checkout",
-            EvaluationContext.For("user-1").With("plan", "free"),
+            FlagContext.For("user-1").With("plan", "free"),
             TestContext.Current.CancellationToken));
     }
 
@@ -144,7 +144,7 @@ public class EvaluationContextTests
 
         Assert.True(await client.IsEnabledAsync(
             "never-heard-of-it",
-            EvaluationContext.For("user-17"),
+            FlagContext.For("user-17"),
             defaultValue: true,
             TestContext.Current.CancellationToken));
     }
@@ -160,7 +160,7 @@ public class EvaluationContextTests
         {
             await client.IsEnabledAsync(
                 "new-checkout",
-                EvaluationContext.For($"user-{i}").With("plan", "pro"),
+                FlagContext.For($"user-{i}").With("plan", "pro"),
                 TestContext.Current.CancellationToken);
         }
 

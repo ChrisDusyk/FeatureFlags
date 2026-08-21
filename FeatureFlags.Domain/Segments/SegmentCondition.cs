@@ -37,7 +37,7 @@ public sealed record SegmentCondition
         if (string.IsNullOrWhiteSpace(attribute))
             return Result.Failure<SegmentCondition>(SegmentErrors.AttributeRequired);
 
-        var normalizedAttribute = EvaluationContext.NormaliseName(attribute);
+        var normalizedAttribute = FlagContext.NormaliseName(attribute);
 
         if (normalizedAttribute.Length > MaxAttributeLength)
             return Result.Failure<SegmentCondition>(SegmentErrors.AttributeTooLong);

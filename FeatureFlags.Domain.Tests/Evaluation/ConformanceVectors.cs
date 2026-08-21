@@ -56,7 +56,7 @@ internal sealed class ContextVector
 
     public Dictionary<string, AttributeValue>? Attributes { get; set; }
 
-    public EvaluationContext ToContext() => new(Key, Attributes);
+    public FlagContext ToContext() => new(Key, Attributes);
 }
 
 internal sealed class SegmentCase

@@ -25,12 +25,12 @@ public class SubstitutedClientTests
         public Task<bool> IsEnabledAsync(string key, bool defaultValue, CancellationToken cancellationToken = default) =>
             Task.FromResult(true);
 
-        public Task<bool> IsEnabledAsync(string key, EvaluationContext context, CancellationToken cancellationToken = default) =>
+        public Task<bool> IsEnabledAsync(string key, FlagContext context, CancellationToken cancellationToken = default) =>
             Task.FromResult(true);
 
         public Task<bool> IsEnabledAsync(
             string key,
-            EvaluationContext context,
+            FlagContext context,
             bool defaultValue,
             CancellationToken cancellationToken = default) =>
             Task.FromResult(true);
@@ -52,12 +52,12 @@ public class SubstitutedClientTests
         public Task<bool> IsEnabledAsync(string key, bool defaultValue, CancellationToken cancellationToken = default) =>
             Task.FromResult(defaultValue);
 
-        public Task<bool> IsEnabledAsync(string key, EvaluationContext context, CancellationToken cancellationToken = default) =>
+        public Task<bool> IsEnabledAsync(string key, FlagContext context, CancellationToken cancellationToken = default) =>
             Task.FromResult(false);
 
         public Task<bool> IsEnabledAsync(
             string key,
-            EvaluationContext context,
+            FlagContext context,
             bool defaultValue,
             CancellationToken cancellationToken = default) =>
             Task.FromResult(defaultValue);

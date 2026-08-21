@@ -53,7 +53,7 @@ public class FlagEvaluatorConformanceTests
         // IsEnabled("New-Checkout") for anyone relying on it, silently and only at run time.
         var ruleset = new Ruleset("prod", [new RulesetFlag("new-checkout", true, [])], []);
 
-        var evaluated = FlagEvaluator.EvaluateAll(ruleset, EvaluationContext.Empty);
+        var evaluated = FlagEvaluator.EvaluateAll(ruleset, FlagContext.Empty);
 
         Assert.True(evaluated["New-Checkout"]);
     }

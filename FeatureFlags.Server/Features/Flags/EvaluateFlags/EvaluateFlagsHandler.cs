@@ -10,7 +10,7 @@ namespace FeatureFlags.Server.Features.Flags.EvaluateFlags;
 /// <para>
 /// This route predates segments and keeps its exact shape, because it is half of the compatibility
 /// surface <c>clients/README.md</c> documents. What changed underneath is that it now evaluates
-/// against <see cref="EvaluationContext.Empty"/> rather than reading a bare boolean — so a flag
+/// against <see cref="FlagContext.Empty"/> rather than reading a bare boolean — so a flag
 /// that has been given targeting reads <c>false</c> here.
 /// </para>
 /// <para>
@@ -52,7 +52,7 @@ public sealed class EvaluateFlagsHandler(RulesetProvider provider)
         var evaluated = new Dictionary<string, bool>(cached.Ruleset.Flags.Count, StringComparer.Ordinal);
 
         foreach (var flag in cached.Ruleset.Flags)
-            evaluated[flag.Key] = FlagEvaluator.Evaluate(flag, cached.Ruleset.SegmentsByKey(), EvaluationContext.Empty);
+            evaluated[flag.Key] = FlagEvaluator.Evaluate(flag, cached.Ruleset.SegmentsByKey(), FlagContext.Empty);
 
         return new EvaluatedFlags(
             new EvaluateFlagsResponse(cached.Ruleset.Environment, evaluated),

@@ -22,7 +22,7 @@ public interface IFeatureFlagClient
     /// <para>
     /// A flag narrowed to a segment is <c>false</c> here, because a caller who has not said who is
     /// asking has not described anybody the segment could contain. Pass an
-    /// <see cref="EvaluationContext"/> to get an answer about a person.
+    /// <see cref="FlagContext"/> to get an answer about a person.
     /// </para>
     /// </summary>
     Task<bool> IsEnabledAsync(string key, CancellationToken cancellationToken = default);
@@ -47,14 +47,14 @@ public interface IFeatureFlagClient
     /// call site.
     /// </para>
     /// </summary>
-    Task<bool> IsEnabledAsync(string key, EvaluationContext context, CancellationToken cancellationToken = default);
+    Task<bool> IsEnabledAsync(string key, FlagContext context, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Whether a flag is on for this person, with the answer to give when there is nothing to go on.
     /// </summary>
     Task<bool> IsEnabledAsync(
         string key,
-        EvaluationContext context,
+        FlagContext context,
         bool defaultValue,
         CancellationToken cancellationToken = default);
 

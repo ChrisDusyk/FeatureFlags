@@ -39,23 +39,23 @@ internal sealed class FeatureFlagClient(
     private volatile FlagSnapshot? _snapshot;
 
     public Task<bool> IsEnabledAsync(string key, CancellationToken cancellationToken = default) =>
-        IsEnabledAsync(key, EvaluationContext.Empty, defaultValue: false, cancellationToken);
+        IsEnabledAsync(key, FlagContext.Empty, defaultValue: false, cancellationToken);
 
     public Task<bool> IsEnabledAsync(
         string key,
         bool defaultValue,
         CancellationToken cancellationToken = default) =>
-        IsEnabledAsync(key, EvaluationContext.Empty, defaultValue, cancellationToken);
+        IsEnabledAsync(key, FlagContext.Empty, defaultValue, cancellationToken);
 
     public Task<bool> IsEnabledAsync(
         string key,
-        EvaluationContext context,
+        FlagContext context,
         CancellationToken cancellationToken = default) =>
         IsEnabledAsync(key, context, defaultValue: false, cancellationToken);
 
     public async Task<bool> IsEnabledAsync(
         string key,
-        EvaluationContext context,
+        FlagContext context,
         bool defaultValue,
         CancellationToken cancellationToken = default)
     {

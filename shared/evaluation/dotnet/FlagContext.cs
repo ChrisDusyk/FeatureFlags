@@ -21,13 +21,13 @@ namespace FeatureFlags.Evaluation;
 /// direction for a flag that has been targeted.
 /// </para>
 /// </summary>
-public sealed class EvaluationContext(string? key, IReadOnlyDictionary<string, AttributeValue>? attributes)
+public sealed class FlagContext(string? key, IReadOnlyDictionary<string, AttributeValue>? attributes)
 {
     private static readonly IReadOnlyDictionary<string, AttributeValue> NoAttributes =
         new Dictionary<string, AttributeValue>(StringComparer.Ordinal);
 
     /// <summary>The empty context: nobody in particular, described by nothing.</summary>
-    public static EvaluationContext Empty { get; } = new(null, null);
+    public static FlagContext Empty { get; } = new(null, null);
 
     /// <summary>
     /// What the application calls this subject — a user id, an account id, a device. Null when the
@@ -43,20 +43,20 @@ public sealed class EvaluationContext(string? key, IReadOnlyDictionary<string, A
     /// default.</summary>
     /// <summary>A context describing this subject and nothing else yet. The start of a chain of
     /// <see cref="With(string, string)"/> calls.</summary>
-    public static EvaluationContext For(string? key) => new(key, null);
+    public static FlagContext For(string? key) => new(key, null);
 
     /// <summary>This context plus one text attribute. Returns a new instance — a context is
     /// immutable, so one built once and held for a process cannot be changed under a reader.</summary>
-    public EvaluationContext With(string name, string value) => With(name, AttributeValue.OfText(value));
+    public FlagContext With(string name, string value) => With(name, AttributeValue.OfText(value));
 
     /// <summary>This context plus one numeric attribute.</summary>
-    public EvaluationContext With(string name, double value) => With(name, AttributeValue.OfNumber(value));
+    public FlagContext With(string name, double value) => With(name, AttributeValue.OfNumber(value));
 
     /// <summary>This context plus one true/false attribute.</summary>
-    public EvaluationContext With(string name, bool value) => With(name, AttributeValue.OfBoolean(value));
+    public FlagContext With(string name, bool value) => With(name, AttributeValue.OfBoolean(value));
 
     /// <summary>This context plus one already-typed attribute.</summary>
-    public EvaluationContext With(string name, AttributeValue value)
+    public FlagContext With(string name, AttributeValue value)
     {
         if (name is null)
             throw new ArgumentNullException(nameof(name));
@@ -68,7 +68,7 @@ public sealed class EvaluationContext(string? key, IReadOnlyDictionary<string, A
 
         combined[NormaliseName(name)] = value;
 
-        return new EvaluationContext(Key, combined);
+        return new FlagContext(Key, combined);
     }
 
     /// <summary>
@@ -76,7 +76,7 @@ public sealed class EvaluationContext(string? key, IReadOnlyDictionary<string, A
     /// <paramref name="defaults"/> carries is kept — which is what lets an application set the
     /// traits that never change once, at registration, and still describe a user per call.
     /// </summary>
-    public EvaluationContext WithDefaults(EvaluationContext? defaults)
+    public FlagContext WithDefaults(FlagContext? defaults)
     {
         if (defaults is null || (defaults.Key is null && defaults.Attributes.Count == 0))
             return this;
@@ -90,7 +90,7 @@ public sealed class EvaluationContext(string? key, IReadOnlyDictionary<string, A
         foreach (var pair in Attributes)
             combined[pair.Key] = pair.Value;
 
-        return new EvaluationContext(Key ?? defaults.Key, combined);
+        return new FlagContext(Key ?? defaults.Key, combined);
     }
 
     /// <summary>Looks an attribute up by name, folding the name the same way this context folded

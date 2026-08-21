@@ -61,5 +61,5 @@ public sealed class FeatureFlagsOptions
     /// least obvious way to get a wrong answer.
     /// </para>
     /// </summary>
-    public EvaluationContext? DefaultContext { get; set; }
+    public FlagContext? DefaultContext { get; set; }
 }

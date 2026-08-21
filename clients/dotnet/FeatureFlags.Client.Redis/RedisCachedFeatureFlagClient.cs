@@ -31,7 +31,7 @@ internal sealed class RedisCachedFeatureFlagClient : IFeatureFlagClient
     private readonly TimeProvider _timeProvider;
     private readonly FusionCacheEntryOptions _entryOptions;
     private readonly string _cacheKey;
-    private readonly EvaluationContext? _defaultContext;
+    private readonly FlagContext? _defaultContext;
 
     private static readonly Ruleset EmptyRuleset = new(string.Empty, [], []);
 
@@ -80,23 +80,23 @@ internal sealed class RedisCachedFeatureFlagClient : IFeatureFlagClient
     }
 
     public Task<bool> IsEnabledAsync(string key, CancellationToken cancellationToken = default) =>
-        IsEnabledAsync(key, EvaluationContext.Empty, defaultValue: false, cancellationToken);
+        IsEnabledAsync(key, FlagContext.Empty, defaultValue: false, cancellationToken);
 
     public Task<bool> IsEnabledAsync(
         string key,
         bool defaultValue,
         CancellationToken cancellationToken = default) =>
-        IsEnabledAsync(key, EvaluationContext.Empty, defaultValue, cancellationToken);
+        IsEnabledAsync(key, FlagContext.Empty, defaultValue, cancellationToken);
 
     public Task<bool> IsEnabledAsync(
         string key,
-        EvaluationContext context,
+        FlagContext context,
         CancellationToken cancellationToken = default) =>
         IsEnabledAsync(key, context, defaultValue: false, cancellationToken);
 
     public async Task<bool> IsEnabledAsync(
         string key,
-        EvaluationContext context,
+        FlagContext context,
         bool defaultValue,
         CancellationToken cancellationToken = default)
     {

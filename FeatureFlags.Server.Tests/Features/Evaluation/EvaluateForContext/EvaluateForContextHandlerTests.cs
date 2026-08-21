@@ -49,12 +49,12 @@ public class EvaluateForContextHandlerTests
         return segmentKey;
     }
 
-    private async Task<EvaluateForContextResponse> EvaluateAsync(EvaluationContext context) =>
+    private async Task<EvaluateForContextResponse> EvaluateAsync(FlagContext context) =>
         (await CreateSut().HandleAsync(
             new EvaluateForContextQuery(EnvironmentKey.Production, context),
             TestContext.Current.CancellationToken)).Value;
 
-    private static EvaluationContext Context(string? key, params (string Name, AttributeValue Value)[] attributes) =>
+    private static FlagContext Context(string? key, params (string Name, AttributeValue Value)[] attributes) =>
         new(key, attributes.ToDictionary(pair => pair.Name, pair => pair.Value));
 
     [Fact]
@@ -62,7 +62,7 @@ public class EvaluateForContextHandlerTests
     {
         SeedFlag("dark-mode");
 
-        Assert.True((await EvaluateAsync(EvaluationContext.Empty)).Flags["dark-mode"]);
+        Assert.True((await EvaluateAsync(FlagContext.Empty)).Flags["dark-mode"]);
         Assert.True((await EvaluateAsync(Context("user-17"))).Flags["dark-mode"]);
     }
 
@@ -89,7 +89,7 @@ public class EvaluateForContextHandlerTests
             [], [], [SegmentCondition.Create("plan", "equals", [AttributeValue.OfText("pro")]).Value]).Value);
         _flags.SetTargeting(flag, EnvironmentKey.Production, [segment], Now);
 
-        Assert.False((await EvaluateAsync(EvaluationContext.Empty)).Flags["new-checkout"]);
+        Assert.False((await EvaluateAsync(FlagContext.Empty)).Flags["new-checkout"]);
     }
 
     [Fact]
@@ -150,7 +150,7 @@ public class EvaluateForContextHandlerTests
     {
         SeedFlag("dark-mode");
 
-        Assert.Equal("prod", (await EvaluateAsync(EvaluationContext.Empty)).Environment);
+        Assert.Equal("prod", (await EvaluateAsync(FlagContext.Empty)).Environment);
     }
 
     [Fact]

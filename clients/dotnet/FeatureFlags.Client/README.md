@@ -55,7 +55,7 @@ A flag can be narrowed to a *segment* — a named group defined in the console f
 application already knows. Describe whoever you are asking about, and the answer is about them:
 
 ```csharp
-var context = EvaluationContext.For(user.Id)
+var context = FlagContext.For(user.Id)
     .With("plan", user.Plan)
     .With("accountAgeDays", user.AccountAge.TotalDays)
     .With("internal", user.IsStaff);
