@@ -1,7 +1,9 @@
-using FeatureFlags.Evaluation;
 using FeatureFlags.Infrastructure;
 using FeatureFlags.Server.Api;
 using FeatureFlags.Server.Features.Flags.CreateFlag;
+using FeatureFlags.Server.Evaluation;
+using FeatureFlags.Server.Features.Evaluation.EvaluateForContext;
+using FeatureFlags.Server.Features.Evaluation.GetRuleset;
 using FeatureFlags.Server.Features.Flags.EvaluateFlags;
 using FeatureFlags.Server.Features.Flags.GetFlag;
 using FeatureFlags.Server.Features.Flags.GetFlagHistory;
@@ -43,12 +45,6 @@ builder.AddConsoleAuthentication();
 
 // Add services to the container.
 builder.Services.AddProblemDetails();
-
-// A context attribute and a condition value are bare JSON primitives on the wire, because JSON's
-// own types are exactly the three one can hold. Registering the converter here is what lets model
-// binding read the same shape a ruleset payload is written in — one rendering, not two.
-builder.Services.ConfigureHttpJsonOptions(options =>
-    options.SerializerOptions.Converters.Add(new AttributeValueJsonConverter()));
 builder.Services.AddBrowserCors(builder.Configuration);
 builder.Services.AddSingleton<TimeProvider>(TimeProvider.System);
 
@@ -62,6 +58,9 @@ builder.Services.AddScoped<CreateFlagHandler>();
 builder.Services.AddScoped<ListFlagsHandler>();
 builder.Services.AddScoped<ToggleFlagHandler>();
 builder.Services.AddScoped<EvaluateFlagsHandler>();
+builder.Services.AddScoped<RulesetProvider>();
+builder.Services.AddScoped<GetRulesetHandler>();
+builder.Services.AddScoped<EvaluateForContextHandler>();
 builder.Services.AddScoped<GetFlagHandler>();
 builder.Services.AddScoped<UpdateFlagHandler>();
 builder.Services.AddScoped<GetFlagHistoryHandler>();
@@ -154,6 +153,8 @@ api.MapListFlags();
 api.MapCreateFlag();
 api.MapToggleFlag();
 api.MapEvaluateFlags();
+api.MapGetRuleset();
+api.MapEvaluateForContext();
 api.MapGetFlag();
 api.MapUpdateFlag();
 api.MapGetFlagHistory();

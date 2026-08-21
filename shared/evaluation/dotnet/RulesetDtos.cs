@@ -126,8 +126,8 @@ public static class RulesetJson
             DefaultIgnoreCondition = JsonIgnoreCondition.Never,
         };
 
-        options.Converters.Add(new AttributeValueJsonConverter());
-
+        // AttributeValue carries its own converter as an attribute, so there is nothing to
+        // register here — see the note on that type for why it lives there.
         return options;
     }
 }

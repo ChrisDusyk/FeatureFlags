@@ -27,12 +27,20 @@ public enum AttributeValueKind
 /// way they can is if none of them is allowed to be clever.
 /// </para>
 /// <para>
+/// The converter is declared on the type rather than registered in a list of options, because the
+/// places this has to serialize correctly are not all under one roof: model binding, a ruleset
+/// payload, an event's jsonb column, and whatever cache tier a HybridCache entry lands in. Each of
+/// those builds its own options, and one that forgot would fail only where it was hardest to
+/// notice — an in-memory cache would round-trip a definition that Redis silently could not.
+/// </para>
+/// <para>
 /// <see cref="double"/> and not <see cref="decimal"/>, deliberately. JavaScript has one number type
 /// and it is IEEE-754 binary64; a decimal on the server is a value the browser engine cannot
 /// reproduce, and a segment that matches in one place and not the other is worse than one that
 /// cannot express a hundredth of a cent.
 /// </para>
 /// </summary>
+[System.Text.Json.Serialization.JsonConverter(typeof(AttributeValueJsonConverter))]
 public sealed record AttributeValue
 {
     /// <summary>The longest string a context attribute or a condition value may carry.</summary>

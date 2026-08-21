@@ -145,12 +145,9 @@ internal static class SegmentEventSerializer
     private static JsonSerializerOptions BuildPayloadOptions()
     {
         // Case-insensitive for the same reason the flag serializer is: hand-written JSON in a
-        // migration should not have to match a C# property's casing exactly.
-        var options = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
-
-        options.Converters.Add(new AttributeValueJsonConverter());
-
-        return options;
+        // migration should not have to match a C# property's casing exactly. AttributeValue brings
+        // its own converter as an attribute, so there is nothing else to register.
+        return new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
     }
 
     internal sealed record SegmentDefinitionPayload(
