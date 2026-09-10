@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Collections.ObjectModel;
 
 namespace FutureFlags.Evaluation;
 
@@ -33,8 +34,14 @@ public sealed class FlagResolution(
     string? errorMessage = null,
     IReadOnlyDictionary<string, AttributeValue>? flagMetadata = null)
 {
+    // Wrapped, not just typed as read-only. Every resolution that carries no metadata of its own
+    // shares this instance, so a caller who cast the property back to Dictionary<,> and wrote to
+    // it would leak metadata across every unrelated resolution in the process for the rest of its
+    // life. ReadOnlyDictionary refuses the cast, which the interface alone does not — the same fix
+    // as RulesetFlag.DefaultVariants, for the same reason.
     private static readonly IReadOnlyDictionary<string, AttributeValue> NoMetadata =
-        new Dictionary<string, AttributeValue>(StringComparer.Ordinal);
+        new ReadOnlyDictionary<string, AttributeValue>(
+            new Dictionary<string, AttributeValue>(StringComparer.Ordinal));
 
     /// <summary>The value served.</summary>
     public FlagValue Value { get; } = value;
