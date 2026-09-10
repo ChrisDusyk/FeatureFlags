@@ -1,3 +1,4 @@
+using System.Collections.ObjectModel;
 using FutureFlags.Domain.Shared;
 using FutureFlags.Evaluation;
 using FutureFlags.Server.Evaluation;
@@ -41,6 +42,10 @@ public sealed class OfrepEvaluateFlagsHandler(RulesetProvider provider)
             Ofrep.ETagFor(cached.ETag, query.Context)));
     }
 
+    // Wrapped for the same reason as FlagResolution.NoMetadata and FlagContext.NoAttributes: one
+    // instance is handed to every bulk response, so a cast-and-write would leak metadata across
+    // every OFREP answer this process serves.
     private static readonly IReadOnlyDictionary<string, AttributeValue> NoMetadata =
-        new Dictionary<string, AttributeValue>(StringComparer.Ordinal);
+        new ReadOnlyDictionary<string, AttributeValue>(
+            new Dictionary<string, AttributeValue>(StringComparer.Ordinal));
 }
