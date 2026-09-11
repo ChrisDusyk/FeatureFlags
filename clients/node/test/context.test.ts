@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
+import { normalizeContext } from '../src/context.js';
 import { createFutureFlagsClient, type FlagContext } from '../src/index.js';
 import { StubServer } from './stub-server.js';
 
@@ -36,6 +37,46 @@ function localClient(defaultContext?: FlagContext) {
     }),
   };
 }
+
+describe('normalizeContext representability limits', () => {
+  // Matching AttributeValue.MaxTextLength / MaxMagnitude in shared/evaluation/dotnet: a value the
+  // server and the .NET client would drop at their own boundary has to be dropped here too, or a
+  // rule like starts-with could match locally in Node and non-match through OFREP on the identical
+  // context.
+  it('drops a string past the shared 512-character limit', () => {
+    const tooLong = 'x'.repeat(513);
+
+    const context = normalizeContext({ attributes: { name: tooLong } });
+
+    expect(context.attributes.has('name')).toBe(false);
+  });
+
+  it('keeps a string at exactly the shared limit', () => {
+    const atLimit = 'x'.repeat(512);
+
+    const context = normalizeContext({ attributes: { name: atLimit } });
+
+    expect(context.attributes.get('name')).toBe(atLimit);
+  });
+
+  it('drops a number past the shared 2^53 magnitude limit', () => {
+    const context = normalizeContext({ attributes: { count: 2 ** 53 + 2 } });
+
+    expect(context.attributes.has('count')).toBe(false);
+  });
+
+  it('keeps a number at exactly the shared magnitude limit', () => {
+    const context = normalizeContext({ attributes: { count: 2 ** 53 } });
+
+    expect(context.attributes.get('count')).toBe(2 ** 53);
+  });
+
+  it('drops a large negative number the same as a large positive one', () => {
+    const context = normalizeContext({ attributes: { count: -(2 ** 53) - 2 } });
+
+    expect(context.attributes.has('count')).toBe(false);
+  });
+});
 
 describe('evaluating for a person with a secret key', () => {
   it('answers true for a matching context', async () => {
