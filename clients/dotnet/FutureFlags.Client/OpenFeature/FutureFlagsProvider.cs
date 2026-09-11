@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Net.Http;
 using System.Threading;
 using System.Threading.Tasks;
 using FutureFlags.Evaluation;
@@ -79,7 +80,7 @@ public sealed class FutureFlagsProvider(IFutureFlagsClient client) : FeatureProv
         string defaultValue,
         EvaluationContext? context = null,
         CancellationToken cancellationToken = default) =>
-        UnsupportedAsync(flagKey, defaultValue, "string", cancellationToken);
+        UnsupportedAsync(flagKey, defaultValue, "string", context, cancellationToken);
 
     /// <inheritdoc />
     public override Task<ResolutionDetails<int>> ResolveIntegerValueAsync(
@@ -87,7 +88,7 @@ public sealed class FutureFlagsProvider(IFutureFlagsClient client) : FeatureProv
         int defaultValue,
         EvaluationContext? context = null,
         CancellationToken cancellationToken = default) =>
-        UnsupportedAsync(flagKey, defaultValue, "number", cancellationToken);
+        UnsupportedAsync(flagKey, defaultValue, "number", context, cancellationToken);
 
     /// <inheritdoc />
     public override Task<ResolutionDetails<double>> ResolveDoubleValueAsync(
@@ -95,7 +96,7 @@ public sealed class FutureFlagsProvider(IFutureFlagsClient client) : FeatureProv
         double defaultValue,
         EvaluationContext? context = null,
         CancellationToken cancellationToken = default) =>
-        UnsupportedAsync(flagKey, defaultValue, "number", cancellationToken);
+        UnsupportedAsync(flagKey, defaultValue, "number", context, cancellationToken);
 
     /// <inheritdoc />
     public override Task<ResolutionDetails<Value>> ResolveStructureValueAsync(
@@ -103,7 +104,7 @@ public sealed class FutureFlagsProvider(IFutureFlagsClient client) : FeatureProv
         Value defaultValue,
         EvaluationContext? context = null,
         CancellationToken cancellationToken = default) =>
-        UnsupportedAsync(flagKey, defaultValue, "object", cancellationToken);
+        UnsupportedAsync(flagKey, defaultValue, "object", context, cancellationToken);
 
     /// <summary>
     /// Loads the first ruleset, so a client created after <c>SetProviderAsync</c> returns is
@@ -114,6 +115,14 @@ public sealed class FutureFlagsProvider(IFutureFlagsClient client) : FeatureProv
     /// terminate abnormally, but this client's whole posture is that a flag service being
     /// unreachable must not take down the application reading it — so the provider comes up and
     /// every resolution says PROVIDER_NOT_READY until a background refresh succeeds.
+    /// </para>
+    /// <para>
+    /// <see cref="FutureFlagsException"/> is not the only shape "unreachable" takes: a refresh
+    /// forwards <c>HttpClient.SendAsync</c>'s own failures — <see cref="HttpRequestException"/> for a
+    /// connection that never opens, and an <see cref="OperationCanceledException"/> that is this
+    /// client's own request timeout rather than <paramref name="cancellationToken"/> firing — and
+    /// those are exactly the same "flags service is down" case, not a reason to fail initialization.
+    /// The filtered catch above still rethrows when the caller's own token is what fired.
     /// </para>
     /// </summary>
     public override async Task InitializeAsync(
@@ -131,6 +140,16 @@ public sealed class FutureFlagsProvider(IFutureFlagsClient client) : FeatureProv
         catch (FutureFlagsException)
         {
             // Deliberately absorbed — see the note above.
+        }
+        catch (HttpRequestException)
+        {
+            // Also absorbed: a connection failure is exactly as "unreachable" as anything
+            // FutureFlagsException already covers.
+        }
+        catch (OperationCanceledException)
+        {
+            // The client's own request timeout — the caller's token was checked above and did not
+            // fire, so this is the same "unreachable" case under a different exception type.
         }
     }
 
@@ -257,15 +276,23 @@ public sealed class FutureFlagsProvider(IFutureFlagsClient client) : FeatureProv
     /// from a boolean would be worse than useless. The flag is still looked up first, so a
     /// misspelled key is reported as missing rather than as a type problem.
     /// </para>
+    /// <para>
+    /// The context is still converted and passed through even though today's answer never depends
+    /// on it: a resolution can carry <see cref="EvaluationErrorCode.TargetingKeyMissing"/> or vary
+    /// its error message by who asked, and a future non-boolean flag makes the value itself
+    /// context-dependent. Resolving for <see cref="FlagContext.Empty"/> instead would silently
+    /// evaluate every caller as anonymous the day that stops being hypothetical.
+    /// </para>
     /// </summary>
     private async Task<ResolutionDetails<T>> UnsupportedAsync<T>(
         string flagKey,
         T defaultValue,
         string requested,
+        EvaluationContext? context,
         CancellationToken cancellationToken)
     {
         var resolution = await _client
-            .ResolveAsync(flagKey, FlagContext.Empty, cancellationToken)
+            .ResolveAsync(flagKey, ToFlagContext(context), cancellationToken)
             .ConfigureAwait(false);
 
         return resolution.ErrorCode is not null

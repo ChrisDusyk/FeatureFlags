@@ -1,3 +1,4 @@
+using System.Net.Http;
 using FutureFlags.Client.OpenFeature;
 using FutureFlags.Evaluation;
 using OpenFeature.Constant;
@@ -38,7 +39,10 @@ public class OpenFeatureProviderTests
             return Task.FromResult(resolution);
         }
 
-        public Task RefreshAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
+        public Exception? RefreshFailure { get; set; }
+
+        public Task RefreshAsync(CancellationToken cancellationToken = default) =>
+            RefreshFailure is null ? Task.CompletedTask : Task.FromException(RefreshFailure);
     }
 
     private static FutureFlagsProvider ProviderFor(FlagResolution resolution) => new(new StubClient(resolution));
@@ -232,6 +236,80 @@ public class OpenFeatureProviderTests
             TestContext.Current.CancellationToken);
 
         Assert.Equal("user-17", client.LastContext?.Key);
+    }
+
+    [Theory]
+    [InlineData("string")]
+    [InlineData("integer")]
+    [InlineData("double")]
+    [InlineData("structure")]
+    public async Task ResolveNonBoolean_ShouldPassTheContextThrough(string kind)
+    {
+        // These overloads answer TYPE_MISMATCH today because every flag this platform can author is
+        // boolean, but the lookup itself must still run for the caller's own context — resolving for
+        // FlagContext.Empty instead would evaluate every caller as anonymous the day a targeted
+        // non-boolean flag exists.
+        var client = new StubClient(On());
+        var provider = new FutureFlagsProvider(client);
+        var context = EvaluationContext.Builder().SetTargetingKey("user-17").Build();
+
+        switch (kind)
+        {
+            case "string":
+                await provider.ResolveStringValueAsync(
+                    "f", "fallback", context, TestContext.Current.CancellationToken);
+                break;
+            case "integer":
+                await provider.ResolveIntegerValueAsync(
+                    "f", 7, context, TestContext.Current.CancellationToken);
+                break;
+            case "double":
+                await provider.ResolveDoubleValueAsync(
+                    "f", 1.5, context, TestContext.Current.CancellationToken);
+                break;
+            default:
+                await provider.ResolveStructureValueAsync(
+                    "f", new Value("fallback"), context, TestContext.Current.CancellationToken);
+                break;
+        }
+
+        Assert.Equal("user-17", client.LastContext?.Key);
+    }
+
+    [Theory]
+    [InlineData("wrapped")]
+    [InlineData("connection")]
+    [InlineData("timeout")]
+    public async Task Initialize_WhenRefreshCannotReachTheServer_ShouldNotThrow(string failure)
+    {
+        // The specification requires a flag evaluation never to throw, and this client's posture is
+        // that an unreachable service is not a reason to fail initialization — every resolution says
+        // PROVIDER_NOT_READY instead. HttpRequestException (a connection that never opens) and a bare
+        // TaskCanceledException (this client's own request timeout, not caller cancellation) are the
+        // same "unreachable" case as FutureFlagsException, just thrown from a different layer.
+        Exception exception = failure switch
+        {
+            "wrapped" => new FutureFlagsException("unreachable"),
+            "connection" => new HttpRequestException("connection refused"),
+            _ => new TaskCanceledException(),
+        };
+        var client = new StubClient(On()) { RefreshFailure = exception };
+
+        await new FutureFlagsProvider(client).InitializeAsync(
+            EvaluationContext.Empty, TestContext.Current.CancellationToken);
+    }
+
+    [Fact]
+    public async Task Initialize_WhenTheCallerCancels_ShouldStillThrow()
+    {
+        // The one case that must not be absorbed: the caller's own cancellation is an instruction,
+        // not a server failure, and swallowing it would leave them waiting on a token they cancelled.
+        using var cts = new CancellationTokenSource();
+        cts.Cancel();
+        var client = new StubClient(On()) { RefreshFailure = new OperationCanceledException(cts.Token) };
+
+        await Assert.ThrowsAsync<OperationCanceledException>(() =>
+            new FutureFlagsProvider(client).InitializeAsync(EvaluationContext.Empty, cts.Token));
     }
 
     private static FlagResolution On() =>
