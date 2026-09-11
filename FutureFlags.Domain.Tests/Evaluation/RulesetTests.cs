@@ -71,4 +71,31 @@ public class RulesetTests
         Assert.Equal(one.OffValue, two.OffValue);
     }
 
+    [Fact]
+    public void ASuppliedVariantSet_ShouldNotBeMutableThroughACast()
+    {
+        // RulesetProvider.Build hands this constructor a dictionary and then caches the resulting
+        // RulesetFlag, so a cast-and-write here would corrupt every environment's shared, cached
+        // ruleset for the life of the process — not just one flag's lookup, the way the default
+        // variant set fix covers.
+        var flag = new RulesetFlag(
+            "f", true, [], FlagValueTypeNames.Boolean,
+            new Dictionary<string, FlagValue>(StringComparer.Ordinal) { ["on"] = FlagValue.True, ["off"] = FlagValue.False },
+            "on", "off");
+
+        Assert.False(flag.Variants is Dictionary<string, FlagValue>);
+    }
+
+    [Fact]
+    public void MutatingTheDictionaryPassedIn_ShouldNotChangeTheFlag()
+    {
+        // The constructor copies rather than adopting the caller's dictionary by reference, so a
+        // caller who keeps mutating their own dictionary after construction cannot reach back in.
+        var supplied = new Dictionary<string, FlagValue>(StringComparer.Ordinal) { ["on"] = FlagValue.True, ["off"] = FlagValue.False };
+        var flag = new RulesetFlag("f", true, [], FlagValueTypeNames.Boolean, supplied, "on", "off");
+
+        supplied["on"] = FlagValue.OfString("tampered");
+
+        Assert.Equal(FlagValue.True, flag.Variants["on"]);
+    }
 }

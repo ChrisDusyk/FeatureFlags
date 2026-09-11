@@ -119,9 +119,29 @@ public sealed class RulesetFlag
         IsEnabled = isEnabled;
         TargetedSegments = targetedSegments ?? [];
         ValueType = valueType ?? FlagValueTypeNames.Boolean;
-        Variants = variants ?? DefaultVariants;
+        // Copied and wrapped even when supplied, not just when falling back to the default: this
+        // ruleset is what RulesetProvider.Build hands to HybridCache, so the instance a caller casts
+        // and writes to is the one every subsequent request for this environment reads. The earlier
+        // reasoning for storing a caller's dictionary as-is assumed it belonged to whoever passed
+        // it; Build's FlagVariants.ToDictionary() belongs to nobody once this constructor returns,
+        // and that is exactly the case worth copying — a ruleset rebuild happens on a cache TTL, not
+        // per request, so the allocation this avoided is not on a hot path.
+        Variants = variants is null ? DefaultVariants : CopyVariants(variants);
         OnVariant = onVariant ?? FlagVariantNames.On;
         OffVariant = offVariant ?? FlagVariantNames.Off;
+    }
+
+    // A manual loop rather than the IEnumerable<KeyValuePair<,>> Dictionary constructor: that
+    // overload does not exist on the netstandard2.0 floor this file also compiles at.
+    private static IReadOnlyDictionary<string, FlagValue> CopyVariants(IReadOnlyDictionary<string, FlagValue> source)
+    {
+        var copy = new Dictionary<string, FlagValue>(StringComparer.Ordinal);
+        foreach (var pair in source)
+        {
+            copy[pair.Key] = pair.Value;
+        }
+
+        return new ReadOnlyDictionary<string, FlagValue>(copy);
     }
 
     // Wrapped, not just typed as read-only. This instance is shared by every flag that arrives
