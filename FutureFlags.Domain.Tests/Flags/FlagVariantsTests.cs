@@ -110,4 +110,23 @@ public class FlagVariantsTests
         Assert.True(FlagVariants.BooleanPair.ValueOf("enabled").IsNone);
         Assert.Equal(FlagValue.True, FlagVariants.BooleanPair.ValueOf("on").Reduce(FlagValue.False));
     }
+
+    [Fact]
+    public void BooleanPair_ShouldNotBeMutableThroughACast()
+    {
+        // BooleanPair is one instance shared by every boolean flag in the process — a cast back to
+        // List<,> (or the array behind it) and a write would change what every one of them serves.
+        Assert.False(FlagVariants.BooleanPair.Variants is List<FlagVariant>);
+        Assert.False(FlagVariants.BooleanPair.Variants is FlagVariant[]);
+    }
+
+    [Fact]
+    public void Create_ShouldNotBeMutableThroughACast()
+    {
+        var result = FlagVariants.Create(FlagValueType.String,
+            [new FlagVariant("red", FlagValue.OfString("red"))]);
+
+        Assert.True(result.IsSuccess);
+        Assert.False(result.Value.Variants is List<FlagVariant>);
+    }
 }

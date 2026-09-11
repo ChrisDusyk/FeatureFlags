@@ -1,3 +1,4 @@
+using System.Collections.ObjectModel;
 using FutureFlags.Domain.Shared;
 using FutureFlags.Evaluation;
 
@@ -36,7 +37,14 @@ public sealed record FlagVariants
 
     public const int MaxNameLength = 100;
 
-    private FlagVariants(IReadOnlyList<FlagVariant> variants) => Variants = variants;
+    // Wrapped, not just typed as read-only. BooleanPair is one instance shared by every boolean
+    // flag in the process, and Create/FromPersisted's lists belong to nobody else once this
+    // constructor returns — so wrapping costs nothing beyond the wrapper itself, and refuses the
+    // cast back to List<,> (or the array behind BooleanPair) that IReadOnlyList alone does not. The
+    // same fix as RulesetFlag.DefaultVariants and FlagResolution.NoMetadata, for the same reason.
+    // IList<,>, not IReadOnlyList<,>, because that is what ReadOnlyCollection<,> wraps without a
+    // copy — every caller already owns a concrete List<,> or array here.
+    private FlagVariants(IList<FlagVariant> variants) => Variants = new ReadOnlyCollection<FlagVariant>(variants);
 
     /// <summary>The variants, deduplicated by name and ordinal-ordered.</summary>
     public IReadOnlyList<FlagVariant> Variants { get; }
