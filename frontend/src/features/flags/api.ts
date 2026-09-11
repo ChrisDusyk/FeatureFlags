@@ -259,13 +259,36 @@ export async function setFlagState(
   return (await response.json()) as FlagStateResult;
 }
 
+/** The pre-variant boolean pair, for a server that predates this field existing at all. */
+const DEFAULT_VARIANTS: FlagVariant[] = [
+  { name: 'on', value: true },
+  { name: 'off', value: false },
+];
+
+/**
+ * Fills in the fields a server from before variants existed never sends.
+ *
+ * During a rolling deployment the new console can be served while a request lands on an old
+ * server instance, whose `/api/flags/{key}` response has no `valueType` or `variants` at all —
+ * `undefined`, not an empty array. Reading `flag.variants.map(...)` against that response throws
+ * and takes the detail screen down, so this fills the same boolean defaults the server itself
+ * assumes for a ruleset predating variants, rather than trusting every caller to guard for it.
+ */
+function normalizeFlagDetail(flag: FlagDetail): FlagDetail {
+  return {
+    ...flag,
+    valueType: flag.valueType ?? 'boolean',
+    variants: flag.variants ?? DEFAULT_VARIANTS,
+  };
+}
+
 export async function getFlag(key: string, signal?: AbortSignal): Promise<FlagDetail> {
   const response = await send(`/api/flags/${encodeURIComponent(key)}`, {
     signal,
     headers: { accept: 'application/json' },
   });
 
-  return (await response.json()) as FlagDetail;
+  return normalizeFlagDetail((await response.json()) as FlagDetail);
 }
 
 /** Updates a flag's name and description. There is no way to send a key here — it cannot change. */
@@ -276,7 +299,7 @@ export async function updateFlag(key: string, input: UpdateFlagInput): Promise<F
     body: JSON.stringify(input),
   });
 
-  return (await response.json()) as FlagDetail;
+  return normalizeFlagDetail((await response.json()) as FlagDetail);
 }
 
 export async function getFlagHistory(key: string, signal?: AbortSignal): Promise<FlagHistoryEntry[]> {
