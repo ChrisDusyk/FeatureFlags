@@ -98,4 +98,21 @@ public class RulesetTests
 
         Assert.Equal(FlagValue.True, flag.Variants["on"]);
     }
+
+    [Fact]
+    public void ANullVariantValue_ShouldReadAsMissingRatherThanPropagatingNull()
+    {
+        // System.Text.Json never calls FlagValueJsonConverter.Read for a JSON null against this
+        // reference-typed value, so a malformed ruleset payload such as {"on": null} hands the
+        // constructor a dictionary whose "on" entry is a literal null FlagValue. OnValue/OffValue
+        // must fall back the same way they do for a variant name with nothing behind it, rather than
+        // handing callers a null they will dereference (Value.Kind) unconditionally.
+        var supplied = new Dictionary<string, FlagValue>(StringComparer.Ordinal) { ["off"] = FlagValue.False };
+        supplied["on"] = null!;
+        var flag = new RulesetFlag("f", true, [], FlagValueTypeNames.Boolean, supplied, "on", "off");
+
+        Assert.False(flag.Variants.ContainsKey("on"));
+        Assert.Equal(FlagValue.True, flag.OnValue);
+        Assert.Equal(FlagValue.False, flag.OffValue);
+    }
 }

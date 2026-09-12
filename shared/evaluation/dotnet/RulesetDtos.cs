@@ -138,7 +138,16 @@ public sealed class RulesetFlag
         var copy = new Dictionary<string, FlagValue>(StringComparer.Ordinal);
         foreach (var pair in source)
         {
-            copy[pair.Key] = pair.Value;
+            // System.Text.Json never calls FlagValueJsonConverter.Read for a JSON null — a reference-
+            // typed converter that does not opt into HandleNull gets skipped entirely, and the
+            // dictionary value is assigned null directly. A malformed ruleset with `"on": null` would
+            // otherwise carry that null through to OnValue/OffValue, which callers dereference
+            // (Value.Kind) unconditionally. Dropped here so a null entry reads the same as a variant
+            // name with nothing behind it — Lookup's existing fallback, not a NullReferenceException.
+            if (pair.Value is not null)
+            {
+                copy[pair.Key] = pair.Value;
+            }
         }
 
         return new ReadOnlyDictionary<string, FlagValue>(copy);
