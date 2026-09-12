@@ -12,8 +12,11 @@ namespace FutureFlags.Infrastructure.Persistence.Migrations
     /// Every column is added with a default so existing rows are backfilled in the same statement
     /// rather than left holding a value the model cannot read — the scaffolded empty strings would
     /// have made <c>FlagValueType.FromPersisted</c> throw on the first read of any flag that
-    /// predates this. The defaults are then dropped, because the model does not declare any and a
-    /// column default it does not know about is drift the next scaffold would try to undo.
+    /// predates this. The defaults are kept rather than dropped: during a rolling deployment a
+    /// pre-variants server instance can still be writing rows through this migrated schema, and its
+    /// INSERT omits these four columns entirely, which a dropped default turns into a NOT NULL
+    /// violation instead of a boolean-shaped row. <c>FlagRowConfiguration</c> declares the same
+    /// defaults on the model, so there is no drift for the next scaffold to "fix".
     /// </para>
     /// <para>
     /// This touches only <c>public</c> tables and has no dependency on <c>auth."user"</c>, unlike
@@ -57,13 +60,6 @@ namespace FutureFlags.Infrastructure.Persistence.Migrations
                 maxLength: 100,
                 nullable: false,
                 defaultValue: "off");
-
-            migrationBuilder.Sql("""
-                ALTER TABLE feature_flags ALTER COLUMN "ValueType" DROP DEFAULT;
-                ALTER TABLE feature_flags ALTER COLUMN "Variants" DROP DEFAULT;
-                ALTER TABLE feature_flag_states ALTER COLUMN "OnVariant" DROP DEFAULT;
-                ALTER TABLE feature_flag_states ALTER COLUMN "OffVariant" DROP DEFAULT;
-                """);
         }
 
         /// <inheritdoc />

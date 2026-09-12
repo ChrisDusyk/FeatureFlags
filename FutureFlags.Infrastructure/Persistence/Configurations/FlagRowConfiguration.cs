@@ -59,7 +59,11 @@ internal sealed class FlagRowConfiguration : IEntityTypeConfiguration<FlagRow>
                 valueType => valueType.Value,
                 value => FlagValueType.FromPersisted(value))
             .HasMaxLength(FlagValueType.MaxLength)
-            .IsRequired();
+            .IsRequired()
+            // Declared (rather than dropped in the migration once existing rows are backfilled) so a
+            // pre-variants server writing through a rolling deployment still gets a valid row instead
+            // of a NOT NULL violation — see AddFlagVariants.
+            .HasDefaultValueSql($"'{FlagValueTypeNames.Boolean}'");
 
         // jsonb, because a name-to-value map has no fixed column shape and nothing queries into it
         // — the ruleset ships the set whole. Serialized with RulesetJson.Options so a FlagValue is
@@ -69,6 +73,7 @@ internal sealed class FlagRowConfiguration : IEntityTypeConfiguration<FlagRow>
             .HasConversion(
                 variants => SerializeVariants(variants),
                 json => DeserializeVariants(json))
+            .HasDefaultValueSql($$"""'{"{{FlagVariantNames.Off}}":false,"{{FlagVariantNames.On}}":true}'::jsonb""")
             .Metadata.SetValueComparer(new ValueComparer<FlagVariants>(
                 // FlagVariants hand-writes sequence equality, so this can defer to it — unlike the
                 // targeted-segments list below, where the default comparer would compare references.
@@ -107,11 +112,13 @@ internal sealed class FlagRowConfiguration : IEntityTypeConfiguration<FlagRow>
 
             state.Property(candidate => candidate.OnVariant)
                 .HasMaxLength(FlagVariants.MaxNameLength)
-                .IsRequired();
+                .IsRequired()
+                .HasDefaultValueSql($"'{FlagVariantNames.On}'");
 
             state.Property(candidate => candidate.OffVariant)
                 .HasMaxLength(FlagVariants.MaxNameLength)
-                .IsRequired();
+                .IsRequired()
+                .HasDefaultValueSql($"'{FlagVariantNames.Off}'");
 
             state.Property(candidate => candidate.TargetedSegments)
                 .HasColumnType("text[]")
