@@ -204,7 +204,10 @@ public class OpenFeatureProviderTests
     [Fact]
     public void ToFlagContext_ShouldRenderADatetimeAsText()
     {
-        var when = new DateTime(2026, 2, 20, 21, 28, 18, DateTimeKind.Utc);
+        // Millisecond precision and a literal "Z" — matching Node's Date.toISOString(), which is
+        // what the OFREP route and the Node providers render the same field with. DateTime's own
+        // "O" format uses seven fractional digits and would not agree.
+        var when = new DateTime(2026, 2, 20, 21, 28, 18, 123, DateTimeKind.Utc);
 
         var context = FutureFlagsProvider.ToFlagContext(EvaluationContext.Builder()
             .Set("signedUpAt", when)
@@ -212,7 +215,23 @@ public class OpenFeatureProviderTests
 
         Assert.True(context.TryGetAttribute("signedUpAt", out var value));
         Assert.Equal(AttributeValueKind.Text, value.Kind);
-        Assert.Equal(when.ToString("O"), value.Text);
+        Assert.Equal("2026-02-20T21:28:18.123Z", value.Text);
+    }
+
+    [Fact]
+    public void ToFlagContext_ShouldTreatAnUnspecifiedKindDatetimeAsUtc()
+    {
+        // A caller that builds a DateTime without a Kind is the common case, and treating it as
+        // Utc (rather than converting as if it were Local) is what keeps this deterministic across
+        // machines in different time zones.
+        var when = new DateTime(2026, 2, 20, 21, 28, 18, 123, DateTimeKind.Unspecified);
+
+        var context = FutureFlagsProvider.ToFlagContext(EvaluationContext.Builder()
+            .Set("signedUpAt", when)
+            .Build());
+
+        Assert.True(context.TryGetAttribute("signedUpAt", out var value));
+        Assert.Equal("2026-02-20T21:28:18.123Z", value.Text);
     }
 
     [Fact]

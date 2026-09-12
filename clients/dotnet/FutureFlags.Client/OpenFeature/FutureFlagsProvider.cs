@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Net.Http;
 using System.Threading;
 using System.Threading.Tasks;
@@ -226,12 +227,29 @@ public sealed class FutureFlagsProvider(IFutureFlagsClient client) : FeatureProv
         // same way — nothing downstream parses it back.
         if (value.IsDateTime)
         {
-            converted = AttributeValue.OfText(value.AsDateTime!.Value.ToString("O"));
+            converted = AttributeValue.OfText(ToIso8601Utc(value.AsDateTime!.Value));
             return converted.IsRepresentable;
         }
 
         // Structures and lists: nothing here can hold them.
         return false;
+    }
+
+    // "O" is not this: it emits seven fractional digits and, for Kind Unspecified, no offset marker
+    // at all. Node's Date.toISOString() — what the OFREP route and the Node providers both use for
+    // the same context field — always normalizes to UTC with exactly three fractional digits and a
+    // literal "Z". Matching that byte-for-byte is what lets a segment condition against a timestamp
+    // match the same way through every evaluation path.
+    private static string ToIso8601Utc(DateTime value)
+    {
+        var utc = value.Kind switch
+        {
+            DateTimeKind.Utc => value,
+            DateTimeKind.Local => value.ToUniversalTime(),
+            _ => DateTime.SpecifyKind(value, DateTimeKind.Utc),
+        };
+
+        return utc.ToString("yyyy-MM-ddTHH:mm:ss.fffZ", CultureInfo.InvariantCulture);
     }
 
     private static ErrorType ToErrorType(string errorCode) => errorCode switch
