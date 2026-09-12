@@ -101,7 +101,15 @@ export function createFutureFlagsClient(options: FutureFlagsOptions): FutureFlag
     : null;
 
   let closed = false;
-  let inFlight: Promise<void> | null = null;
+
+  // The ruleset load is context-independent — any number of concurrent callers should collapse
+  // onto the one refresh already running. Remote (publishable-key) evaluation is not: it is a
+  // request for one specific context's answer, so two different contexts refreshing at once must
+  // not collapse onto each other's promise, or the loser resolves against an answer computed for
+  // somebody else and reports PROVIDER_NOT_READY instead of ever fetching its own. Keyed by
+  // fingerprint and self-cleaning, so it never holds more than what is genuinely in flight.
+  let rulesetInFlight: Promise<void> | null = null;
+  const answersInFlight = new Map<string, Promise<AnswerSnapshot>>();
 
   // Aborts whatever is in flight when close() is called, so a pending fetch cannot keep a process
   // alive or land after the caller has finished with the client.
@@ -187,37 +195,62 @@ export function createFutureFlagsClient(options: FutureFlagsOptions): FutureFlag
     }
   }
 
-  async function loadAnswers(context: NormalizedContext): Promise<void> {
+  async function loadAnswers(context: NormalizedContext): Promise<AnswerSnapshot> {
     const attempt = deadline(lifetime.signal, resolved.timeout);
 
     try {
-      answers = await evaluateRemotely(resolved, context, fingerprintContext(context), attempt);
+      const snapshot = await evaluateRemotely(resolved, context, fingerprintContext(context), attempt);
+
+      // Still recorded as the one most-recently-seen answer, for the same-context fast path below
+      // and for what an explicit refresh() re-requests — but a caller of refreshFor must not read
+      // these back afterwards to learn what its own request produced: a concurrent refresh for a
+      // different context can overwrite them first. It gets the snapshot as this promise's value
+      // instead.
+      answers = snapshot;
       lastContext = context;
+
+      return snapshot;
     } finally {
       attempt.settle();
     }
   }
 
   /**
-   * One refresh at a time. Twenty callers finding the snapshot stale at once should produce one
-   * request, and the nineteen that lost should use what the winner fetched.
+   * One refresh at a time per thing being refreshed. Twenty callers finding the ruleset stale at
+   * once should produce one request, and the nineteen that lost should use what the winner
+   * fetched — but twenty callers each asking about a different context are twenty distinct
+   * answers, and must not collapse onto one request for whichever context got there first.
    */
-  function refreshFor(context: NormalizedContext): Promise<void> {
+  function refreshFor(context: NormalizedContext): Promise<AnswerSnapshot | void> {
     if (closed) {
       return Promise.resolve();
     }
 
-    inFlight ??= (evaluatesLocally ? loadRuleset() : loadAnswers(context)).finally(() => {
-      inFlight = null;
-    });
+    if (evaluatesLocally) {
+      rulesetInFlight ??= loadRuleset().finally(() => {
+        rulesetInFlight = null;
+      });
 
-    return inFlight;
+      return rulesetInFlight;
+    }
+
+    const fingerprint = fingerprintContext(context);
+    let forThisContext = answersInFlight.get(fingerprint);
+
+    if (!forThisContext) {
+      forThisContext = loadAnswers(context).finally(() => {
+        answersInFlight.delete(fingerprint);
+      });
+      answersInFlight.set(fingerprint, forThisContext);
+    }
+
+    return forThisContext;
   }
 
-  function refresh(): Promise<void> {
+  async function refresh(): Promise<void> {
     // With a publishable key there is no context-free thing to refresh, so an explicit refresh
     // reloads whoever was last asked about — which is the answer a caller is actually holding.
-    return refreshFor(lastContext);
+    await refreshFor(lastContext);
   }
 
   async function isEnabled(
@@ -283,17 +316,24 @@ export function createFutureFlagsClient(options: FutureFlagsOptions): FutureFlag
       answers.fingerprint === fingerprint &&
       Date.now() - answers.fetchedAt < resolved.pollingInterval;
 
-    if (!usable && !closed) {
-      await refreshFor(context).catch(() => {});
+    // The snapshot this call's own refresh produced, not the shared `answers` field: a concurrent
+    // refresh for a different context can settle in between and overwrite it before this line
+    // runs, so reading it back here would risk serving (or refusing) based on somebody else's
+    // fetch. refreshFor resolves with exactly what this context's request — the one it started or
+    // the one it joined — actually got.
+    let current = usable ? answers : null;
+
+    if (!current && !closed) {
+      current = (await refreshFor(context).catch(() => null)) ?? null;
     }
 
     // Only an answer computed for *this* context will do. A stale one for somebody else is worse
     // than no answer at all, so it falls through rather than being served.
-    if (answers === null || answers.fingerprint !== fingerprint) {
+    if (current === null || current.fingerprint !== fingerprint) {
       return notReady();
     }
 
-    const value = answers.flags.get(key.toLowerCase());
+    const value = current.flags.get(key.toLowerCase());
 
     if (value === undefined) {
       return {

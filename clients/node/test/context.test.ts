@@ -247,6 +247,28 @@ describe('evaluating for a person with a publishable key', () => {
     flags.close();
   });
 
+  it('answers two people correctly when their first requests overlap', async () => {
+    // Both isEnabled calls start before either's fetch resolves, so their refreshes are genuinely
+    // concurrent. Sharing one in-flight promise between them (keyed by nothing) would resolve the
+    // loser against the winner's context and answer PROVIDER_NOT_READY — which reads as `false`
+    // here — instead of ever fetching its own.
+    const server = new StubServer()
+      .withAnswers({ 'new-checkout': true })
+      .withAnswers({ 'new-checkout': true });
+    const flags = createFutureFlagsClient({ baseAddress: BASE, sdkKey: PUBLISHABLE, fetch: server.fetch });
+
+    const [u1, u2] = await Promise.all([
+      flags.isEnabled('new-checkout', { key: 'u1' }),
+      flags.isEnabled('new-checkout', { key: 'u2' }),
+    ]);
+
+    expect(u1).toBe(true);
+    expect(u2).toBe(true);
+    expect(server.callCount).toBe(2);
+
+    flags.close();
+  });
+
   it('does not spend a request before anybody has been described', async () => {
     const server = new StubServer().withAnswers({ 'new-checkout': true });
 
